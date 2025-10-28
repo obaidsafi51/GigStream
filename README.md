@@ -321,9 +321,6 @@ We welcome contributions! Please see our contributing guidelines:
 
 ---
 
-
----
-
 ## 🏆 Hackathon Submission
 
 This project is submitted to the **Circle Arc Hackathon** (October 2025).
