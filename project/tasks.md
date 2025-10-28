@@ -68,12 +68,12 @@ This document breaks down the GigStream MVP implementation into detailed, action
 
 **Deliverables:**
 
-- [ ] Install Node.js 18+ and npm/yarn
-- [ ] Install Hardhat for smart contract development
-- [ ] Set up Arc testnet RPC access
-- [ ] Install PostgreSQL 15+ locally or via Docker
-- [ ] Set up VS Code with recommended extensions
-- [ ] Create `.env.example` file with required variables:
+- [x] Install Node.js 18+ and npm/yarn
+- [x] Install Hardhat for smart contract development
+- [x] Set up Arc testnet RPC access
+- [x] Install PostgreSQL 15+ locally or via Docker
+- [x] Set up VS Code with recommended extensions
+- [x] Create `.env.example` file with required variables:
 
   ```bash
   # Arc Blockchain
@@ -99,9 +99,9 @@ This document breaks down the GigStream MVP implementation into detailed, action
 
 **Acceptance Criteria:**
 
-- All team members can run local environment
-- Database connection successful
-- Arc testnet RPC accessible
+- ✅ All team members can run local environment
+- ✅ Database connection successful
+- ⚠️ Arc testnet RPC accessible (needs verification)
 
 ### Task 1.3: Circle Developer Account & Wallets Setup
 

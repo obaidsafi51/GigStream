@@ -2,7 +2,6 @@
 
 **AI-Powered Real-Time Payment Streaming for Gig Workers on Circle's Arc Blockchain**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Built on Arc](https://img.shields.io/badge/Built%20on-Arc-blue)](https://www.circle.com/arc)
 
 ---

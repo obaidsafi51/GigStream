@@ -5,6 +5,18 @@ node_modules/
 
 # Testing
 coverage/
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts
+test/
+tests/
+__tests__/
+*.test.tsx
+*.spec.tsx
+test-results/
+playwright-report/
+.nyc_output/
 
 # Next.js
 frontend/.next/
@@ -31,6 +43,7 @@ yarn-error.log*
 .env*.local
 .env.production
 .env.development
+.pgpass
 
 # Vercel
 .vercel
@@ -39,6 +52,7 @@ yarn-error.log*
 contracts/cache/
 contracts/artifacts/
 contracts/typechain-types/
+contracts/test/
 
 # Backend
 backend/dist/
@@ -57,3 +71,18 @@ Thumbs.db
 # Logs
 logs/
 *.log
+
+# Database
+*.sql
+*.sqlite
+*.db
+dump.rdb
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+*~.nib
+
