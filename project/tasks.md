@@ -591,12 +591,12 @@ This document breaks down the GigStream MVP implementation into detailed, action
 
 **Deliverables:**
 
-- [ ] Create Next.js 15 app with TypeScript
+- [x] Create Next.js 15 app with TypeScript
   ```bash
   npx create-next-app@latest frontend --typescript --tailwind --app
   ```
-- [ ] Configure Tailwind CSS 4
-- [ ] Set up App Router structure (design.md Section 6.2):
+- [x] Configure Tailwind CSS 4
+- [x] Set up App Router structure (design.md Section 6.2):
   ```
   frontend/app/
   ├── (worker)/
@@ -605,20 +605,20 @@ This document breaks down the GigStream MVP implementation into detailed, action
   ├── (auth)/
   └── layout.tsx
   ```
-- [ ] Install dependencies:
+- [x] Install dependencies:
   - zustand (state management)
   - react-hook-form (forms)
   - zod (validation)
   - recharts (charts)
   - sonner (toast notifications)
   - **NOTE**: NO Circle SDK needed (wallet management is server-side only)
-- [ ] Configure environment variables
+- [x] Configure environment variables
 
 **Acceptance Criteria:**
 
-- Next.js app runs on localhost:3000
-- Tailwind CSS configured
-- App Router structure matches design
+- ✅ Next.js app runs on localhost:3000
+- ✅ Tailwind CSS configured
+- ✅ App Router structure matches design
 
 ### Task 6.2: UI Component Library Setup
 
