@@ -17,10 +17,11 @@ import {
   toast,
 } from "@/components/ui";
 import { loginSchema, type LoginInput } from "@/lib/validations/auth";
-import { loginUser, ApiError } from "@/lib/api/auth";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login, isLoading: authLoading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
   const {
@@ -36,42 +37,41 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const result = await loginUser(data);
+      const result = await login(data.email, data.password);
 
-      if (result.success && result.data) {
+      if (result.success && result.user) {
         toast.success("Login successful!", {
-          description: `Welcome back, ${result.data.user.name}!`,
+          description: `Welcome back, ${result.user.name}!`,
         });
 
         // Redirect based on role
         const redirectPath =
-          result.data.user.role === "worker"
+          result.user.role === "worker"
             ? "/dashboard"
             : "/platform/dashboard";
 
         router.push(redirectPath);
       } else {
-        throw new Error(result.message || "Login failed");
-      }
-    } catch (error) {
-      if (error instanceof ApiError) {
-        // Handle specific field errors
-        if (error.errors) {
-          Object.entries(error.errors).forEach(([field, messages]) => {
-            setError(field as keyof LoginInput, {
-              message: messages[0],
-            });
+        // Handle login errors
+        if (result.errors) {
+          Object.entries(result.errors).forEach(([field, messages]) => {
+            if (Array.isArray(messages) && messages.length > 0) {
+              setError(field as keyof LoginInput, {
+                message: messages[0],
+              });
+            }
           });
         } else {
           toast.error("Login failed", {
-            description: error.message,
+            description: result.message || "Invalid email or password",
           });
         }
-      } else {
-        toast.error("Login failed", {
-          description: "An unexpected error occurred. Please try again.",
-        });
       }
+    } catch (error) {
+      toast.error("Login failed", {
+        description: "An unexpected error occurred. Please try again.",
+      });
+      console.error("Login error:", error);
     } finally {
       setIsLoading(false);
     }
