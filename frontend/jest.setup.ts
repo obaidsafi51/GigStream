@@ -25,13 +25,21 @@ jest.mock('next/navigation', () => ({
 global.fetch = jest.fn(() =>
   Promise.resolve({
     ok: true,
+    status: 200,
+    statusText: 'OK',
+    headers: new Headers(),
+    redirected: false,
+    type: 'basic' as ResponseType,
+    url: '',
+    bodyUsed: false,
     json: () => Promise.resolve({}),
     text: () => Promise.resolve(''),
     blob: () => Promise.resolve(new Blob()),
     arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
-    clone: () => Promise.resolve({} as Response),
-  } as Response)
-)
+    formData: () => Promise.resolve(new FormData()),
+    clone: function() { return this as Response; },
+  })
+) as jest.Mock
 
 // Reset mocks after each test
 afterEach(() => {
@@ -40,11 +48,19 @@ afterEach(() => {
   global.fetch = jest.fn(() =>
     Promise.resolve({
       ok: true,
+      status: 200,
+      statusText: 'OK',
+      headers: new Headers(),
+      redirected: false,
+      type: 'basic' as ResponseType,
+      url: '',
+      bodyUsed: false,
       json: () => Promise.resolve({}),
       text: () => Promise.resolve(''),
       blob: () => Promise.resolve(new Blob()),
       arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
-      clone: () => Promise.resolve({} as Response),
-    } as Response)
-  )
+      formData: () => Promise.resolve(new FormData()),
+      clone: function() { return this as Response; },
+    })
+  ) as jest.Mock
 })
