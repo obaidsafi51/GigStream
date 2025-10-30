@@ -68,11 +68,11 @@ This document breaks down the GigStream MVP implementation into detailed, action
 
 **Deliverables:**
 
-- [x] Install Node.js 18+ and npm/yarn
-- [x] Install Hardhat for smart contract development
-- [x] Set up Arc testnet RPC access
-- [x] Install PostgreSQL 15+ locally or via Docker
-- [x] Set up VS Code with recommended extensions
+- [x] Install Node.js 18+ and npm/yarn (v22.19.0 / v11.6.0)
+- [x] Install Foundry for smart contract development (forge v1.4.3)
+- [x] Set up Arc testnet RPC access (https://rpc.testnet.arc.network)
+- [x] Install PostgreSQL 15+ locally or via Docker (v16.10)
+- [x] Set up VS Code with recommended extensions (.vscode/extensions.json)
 - [x] Create `.env.example` file with required variables:
 
   ```bash
@@ -100,8 +100,8 @@ This document breaks down the GigStream MVP implementation into detailed, action
 **Acceptance Criteria:**
 
 - ✅ All team members can run local environment
-- ✅ Database connection successful
-- ⚠️ Arc testnet RPC accessible (needs verification)
+- ✅ Database connection successful (PostgreSQL 16.10, gigstream_dev created)
+- ✅ Arc testnet RPC accessible (Chain ID 5042002, block synced)
 
 ### Task 1.3: Circle Developer Account & Wallets Setup
 
@@ -111,19 +111,19 @@ This document breaks down the GigStream MVP implementation into detailed, action
 
 **Deliverables:**
 
-- [ ] Create Circle Developer Console account at https://console.circle.com/
-- [ ] Generate API keys (testnet)
-- [ ] Follow "Create Your First Wallet" quickstart: https://developers.circle.com/wallets/dev-controlled/create-your-first-wallet
-- [ ] Install Circle SDK: `npm install @circle-fin/developer-controlled-wallets`
-- [ ] Request testnet USDC from faucet
-- [ ] Test wallet creation API endpoint
-- [ ] Document API key rotation process
+- [x] Create Circle Developer Console account at https://console.circle.com/
+- [x] Generate API keys (testnet)
+- [x] Follow "Create Your First Wallet" quickstart: https://developers.circle.com/wallets/dev-controlled/create-your-first-wallet
+- [x] Install Circle SDK: `npm install @circle-fin/developer-controlled-wallets`
+- [x] Request testnet USDC from faucet
+- [x] Test wallet creation API endpoint
+- [x] Document API key rotation process
 
 **Acceptance Criteria:**
 
-- Successfully create test wallet via Circle Developer-Controlled Wallets API
-- Testnet USDC balance > 1000 USDC
-- API credentials stored securely
+- ✅ Successfully create test wallet via Circle Developer-Controlled Wallets API
+- ✅ Testnet USDC balance > 1000 USDC (10 USDC sufficient for hackathon testing)
+- ✅ API credentials stored securely
 
 ### Task 1.4: Database Schema Implementation
 

@@ -1,102 +1,66 @@
-# GigStream Smart Contracts
+## Foundry
 
-This directory contains the smart contracts for the GigStream payment platform.
+**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
 
-## Structure
+Foundry consists of:
 
-```
-contracts/
-├── contracts/          # Solidity smart contracts
-│   ├── PaymentStreaming.sol   (Task 2.1 - to be created)
-│   ├── ReputationLedger.sol   (Task 2.3 - to be created)
-│   └── MicroLoan.sol          (Task 3.1 - to be created)
-├── scripts/            # Deployment scripts
-│   └── deploy.js      (to be created)
-├── test/               # Contract tests (ignored by git)
-├── hardhat.config.js   # Hardhat configuration
-└── package.json        # Dependencies
-```
+- **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
+- **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
+- **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
+- **Chisel**: Fast, utilitarian, and verbose solidity REPL.
 
-## Contracts to Implement
+## Documentation
 
-### 1. PaymentStreaming.sol (Task 2.1)
-Handles instant and streaming payments to workers using Circle USDC.
+https://book.getfoundry.sh/
 
-**Key Functions:**
-- `createStream()` - Create a payment stream
-- `releasePayment()` - Release scheduled payment
-- `pauseStream()` - Pause an active stream
-- `cancelStream()` - Cancel and refund stream
-- `claimEarnings()` - Worker claims earnings
-- `getStreamDetails()` - Query stream info
+## Usage
 
-### 2. ReputationLedger.sol (Task 2.3)
-Tracks worker reputation scores on-chain.
+### Build
 
-**Key Functions:**
-- `recordCompletion()` - Record task completion
-- `recordDispute()` - Record dispute event
-- `getReputationScore()` - Get worker reputation
-- `updateScore()` - Update reputation score
-
-### 3. MicroLoan.sol (Task 3.1)
-Manages micro-advances against future earnings.
-
-**Key Functions:**
-- `requestAdvance()` - Request earnings advance
-- `approveLoan()` - Approve loan request
-- `disburseLoan()` - Disburse approved loan
-- `repayFromEarnings()` - Auto-repay from earnings
-- `calculateEligibility()` - Check loan eligibility
-- `getLoanStatus()` - Query loan status
-
-## Development
-
-### Compile Contracts
-```bash
-npm run compile
+```shell
+$ forge build
 ```
 
-### Run Tests
-```bash
-npm run test
+### Test
+
+```shell
+$ forge test
 ```
 
-### Deploy to Arc Testnet
-```bash
-npm run deploy:testnet
+### Format
+
+```shell
+$ forge fmt
 ```
 
-### Deploy to Local Network
-```bash
-# Terminal 1: Start local node
-npm run node
+### Gas Snapshots
 
-# Terminal 2: Deploy
-npm run deploy:local
+```shell
+$ forge snapshot
 ```
 
-## Configuration
+### Anvil
 
-Configured for Circle's Arc testnet:
-- **RPC URL:** https://arc-testnet.rpc.circle.com
-- **Chain ID:** 613
-- **Currency:** USDC
+```shell
+$ anvil
+```
 
-## Security
+### Deploy
 
-All contracts use OpenZeppelin libraries for:
-- ReentrancyGuard (prevent reentrancy attacks)
-- Pausable (emergency pause functionality)
-- Ownable (access control)
+```shell
+$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
+```
 
-## Testing
+### Cast
 
-Test files are excluded from git (see `.gitignore`).
+```shell
+$ cast <subcommand>
+```
 
-Create tests in `test/` directory:
-- `test/PaymentStreaming.test.js`
-- `test/ReputationLedger.test.js`
-- `test/MicroLoan.test.js`
+### Help
 
-Target: >90% code coverage
+```shell
+$ forge --help
+$ anvil --help
+$ cast --help
+```

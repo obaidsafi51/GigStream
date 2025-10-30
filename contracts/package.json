@@ -1,38 +1,37 @@
 {
   "name": "contracts",
   "version": "1.0.0",
-  "description": "",
+  "description": "GigStream Smart Contracts - Foundry Project",
   "main": "index.js",
   "scripts": {
-    "test": "hardhat test",
-    "compile": "hardhat compile",
-    "clean": "hardhat clean",
-    "deploy:local": "hardhat run scripts/deploy.ts --network localhost",
-    "deploy:testnet": "hardhat run scripts/deploy.ts --network arcTestnet",
-    "verify": "hardhat verify --network arcTestnet",
-    "node": "hardhat node",
-    "coverage": "hardhat coverage"
+    "test": "forge test",
+    "test:gas": "forge test --gas-report",
+    "test:coverage": "forge coverage",
+    "build": "forge build",
+    "clean": "forge clean",
+    "deploy:local": "forge script script/Deploy.s.sol:DeployScript --rpc-url http://localhost:8545 --broadcast",
+    "deploy:testnet": "forge script script/Deploy.s.sol:DeployScript --rpc-url arc_testnet --broadcast --verify",
+    "verify": "forge verify-contract",
+    "node": "anvil",
+    "snapshot": "forge snapshot",
+    "format": "forge fmt"
   },
-  "keywords": [],
+  "keywords": [
+    "foundry",
+    "solidity",
+    "smart-contracts",
+    "arc-network",
+    "circle"
+  ],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "type": "module",
   "devDependencies": {
-    "@nomicfoundation/hardhat-ethers": "^4.0.2",
-    "@nomicfoundation/hardhat-verify": "^3.0.4",
-    "@typechain/ethers-v6": "^0.5.1",
-    "@types/chai": "^5.2.3",
-    "@types/node": "^24.9.1",
-    "chai": "^6.2.0",
-    "ethers": "^6.15.0",
-    "hardhat": "^3.0.9",
-    "typechain": "^8.3.2"
+    "@types/node": "^24.9.1"
   },
   "dependencies": {
-    "@openzeppelin/contracts": "^5.4.0",
-    "dotenv": "^17.2.3"
-  },
-  "directories": {
-    "test": "test"
+    "@circle-fin/developer-controlled-wallets": "^9.2.0",
+    "dotenv": "^17.2.3",
+    "ethers": "^6.15.0"
   }
 }
