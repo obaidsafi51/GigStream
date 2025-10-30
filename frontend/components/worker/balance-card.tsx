@@ -1,8 +1,9 @@
-"use client";
+                                                                                                                                                                                                "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import CountUp from "react-countup";
+import { useRealtimeBalance } from "@/hooks/use-realtime-balance";
 
 interface BalanceCardProps {
   initialBalance: number;
@@ -17,60 +18,21 @@ export function BalanceCard({
   initialBalance,
   todayEarnings,
 }: BalanceCardProps) {
-  // Real-time balance updates with polling
-  const [balance, setBalance] = useState(initialBalance);
-  const [isLoading, setIsLoading] = useState(false);
+  const [showBalanceChange, setShowBalanceChange] = useState(false);
 
-  useEffect(() => {
-    let interval = 2000; // 2 seconds initial polling
-    let timeoutId: NodeJS.Timeout;
-    let isActive = true;
-
-    const poll = async () => {
-      if (!isActive) return;
-
-      // Skip polling if tab is not visible
-      if (document.hidden) {
-        timeoutId = setTimeout(poll, 5000);
-        return;
-      }
-
-      try {
-        setIsLoading(true);
-        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3001";
-        const res = await fetch(`${apiUrl}/api/v1/workers/balance`, {
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          setBalance(data.balanceUsdc || initialBalance);
-          interval = 2000; // Reset on success
-        } else {
-          interval = Math.min(interval * 1.5, 10000); // Exponential backoff to max 10s
-        }
-      } catch (error) {
-        console.error("Failed to fetch balance:", error);
-        interval = Math.min(interval * 1.5, 10000); // Exponential backoff
-      } finally {
-        setIsLoading(false);
-      }
-
-      if (isActive) {
-        timeoutId = setTimeout(poll, interval);
-      }
-    };
-
-    // Start polling after component mount
-    poll();
-
-    return () => {
-      isActive = false;
-      clearTimeout(timeoutId);
-    };
-  }, [initialBalance]);
+  // Use the new real-time balance hook
+  const { balance, isLoading, error } = useRealtimeBalance({
+    initialBalance,
+    onBalanceChange: (newBalance, oldBalance) => {
+      console.log(`Balance changed from $${oldBalance} to $${newBalance}`);
+      // Show a subtle animation when balance changes
+      setShowBalanceChange(true);
+      setTimeout(() => setShowBalanceChange(false), 2000);
+    },
+    onError: (error) => {
+      console.error("Balance update error:", error);
+    },
+  });
 
   return (
     <Card className="shadow-lg hover:shadow-xl transition-shadow duration-200">
@@ -79,20 +41,51 @@ export function BalanceCard({
           <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">
             Current Balance
           </h3>
-          {isLoading && (
-            <div className="h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          )}
+          <div className="flex items-center gap-2">
+            {isLoading && (
+              <div className="h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            )}
+            {error && (
+              <div
+                className="h-4 w-4 text-red-500"
+                title="Connection error - retrying..."
+              >
+                <svg
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  className="w-4 h-4"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="mb-6">
-          <div className="text-4xl font-bold text-gray-900 dark:text-white">
+          <div
+            className={`text-4xl font-bold text-gray-900 dark:text-white transition-all duration-300 ${
+              showBalanceChange ? "scale-105 text-green-600 dark:text-green-400" : ""
+            }`}
+          >
             <CountUp
               end={balance}
               decimals={2}
               prefix="$"
-              duration={0.5}
+              duration={0.8}
               preserveValue
               separator=","
+              useEasing={true}
+              easingFn={(t, b, c, d) => {
+                // Ease out cubic for smooth deceleration
+                return c * ((t = t / d - 1) * t * t + 1) + b;
+              }}
             />
             <span className="text-sm text-gray-500 dark:text-gray-400 ml-2 font-normal">
               USDC
