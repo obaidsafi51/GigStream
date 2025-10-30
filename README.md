@@ -49,7 +49,9 @@ GigStream/
 
 - **Cloudflare Workers** - Edge computing runtime
 - **Hono Framework** - Lightweight web framework
-- **PostgreSQL 15+** - Primary database
+- **PostgreSQL 16+** - Primary database with Prisma ORM
+- **Neon.tech** - Serverless PostgreSQL (production)
+- **Prisma ORM** - Type-safe database client
 - **TypeScript 5+** - Type-safe development
 
 ### Frontend
@@ -128,13 +130,32 @@ npm install
 ### 4. Database Setup
 
 ```bash
-# Run database migrations
 cd backend
+
+# Install dependencies
+npm install
+
+# Generate Prisma client
+npm run db:generate
+
+# Run database migrations (creates 8 tables + triggers + views)
 npm run db:migrate
 
-# Seed demo data
+# Seed demo data (10 workers, 5 platforms, 20 tasks)
 npm run db:seed
+
+# (Optional) Open Prisma Studio to browse data
+npm run db:studio
 ```
+
+**Database Details:**
+
+- 8 core tables: workers, platforms, tasks, streams, transactions, reputation_events, loans, audit_logs
+- 6 automated triggers for real-time stats updates
+- 5 analytical views for performance optimization
+- Demo credentials: `alice@example.com` / `demo123`
+
+See [backend/README.md](./backend/README.md) for detailed database documentation.
 
 ### 5. Deploy Smart Contracts
 
