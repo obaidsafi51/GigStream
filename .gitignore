@@ -48,11 +48,11 @@ yarn-error.log*
 # Vercel
 .vercel
 
-# Hardhat
+# Foundry
+contracts/out/
 contracts/cache/
-contracts/artifacts/
-contracts/typechain-types/
-contracts/test/
+contracts/broadcast/
+contracts/lib/
 
 # Backend
 backend/dist/
@@ -86,3 +86,6 @@ temp/
 *.swp
 *~.nib
 
+
+# Circle recovery files
+.circle-recovery*

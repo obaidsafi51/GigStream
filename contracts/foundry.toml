@@ -1,0 +1,25 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+solc_version = "0.8.30"
+optimizer = true
+optimizer_runs = 200
+
+# Remove hardhat remapping, add forge-std
+remappings = [
+    "@openzeppelin/=lib/openzeppelin-contracts/contracts/",
+    "forge-std/=lib/forge-std/src/",
+]
+
+# Arc Testnet RPC
+[rpc_endpoints]
+arc_testnet = "${ARC_TESTNET_RPC_URL}"
+
+# Testing configuration
+[fmt]
+line_length = 120
+tab_width = 4
+
+[fuzz]
+runs = 256
