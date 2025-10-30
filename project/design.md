@@ -1766,9 +1766,9 @@ contract MicroLoan is ReentrancyGuard, Pausable, Ownable {
 
 **Testing:**
 
-- Unit tests with Hardhat/Foundry
+- Unit tests with Foundry (forge test)
 - Integration tests with backend
-- Manual testing via Remix or scripts
+- Gas profiling with forge --gas-report
 - Security scan with Slither
 
 ---
@@ -3622,14 +3622,14 @@ curl https://api.gigstream.app/workers/demo-john/reputation
 - [ ] Initialize Git repository
 - [ ] Set up monorepo structure (Turborepo or Nx)
 - [ ] Configure TypeScript, ESLint, Prettier
-- [ ] Initialize Hardhat/Foundry for smart contracts
+- [ ] Initialize Foundry for smart contracts (forge init)
 - [ ] Write PaymentStreaming contract
   - Core functions: createStream, releasePayment, claimEarnings
-  - Unit tests with Hardhat
+  - Unit tests with Foundry (forge test)
 - [ ] Write ReputationLedger contract
   - Core functions: recordCompletion, getReputationScore
-  - Unit tests
-- [ ] Deploy to Arc testnet
+  - Unit tests with Foundry
+- [ ] Deploy to Arc testnet (custom .mjs script)
 - [ ] Verify contracts on explorer
 
 **Day 2: Database & Circle Integration**
@@ -4501,7 +4501,7 @@ async function logMetrics(metrics: Metrics) {
 **Solidity & Smart Contracts:**
 
 - OpenZeppelin: https://docs.openzeppelin.com/contracts
-- Hardhat: https://hardhat.org/docs
+- Foundry: https://book.getfoundry.sh/
 - Solidity: https://docs.soliditylang.org
 
 **Frontend:**

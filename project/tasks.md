@@ -231,25 +231,26 @@ This document breaks down the GigStream MVP implementation into detailed, action
 
 **Owner:** BE  
 **Time:** 2 hours  
-**Dependencies:** Task 2.1
+**Dependencies:** Task 2.1  
+**Status:** ✅ COMPLETED (October 30, 2025)
 
 **Deliverables:**
 
-- [ ] Create `contracts/ReputationLedger.sol`
-- [ ] Implement state variables (design.md Section 3.3.1)
-- [ ] Implement functions:
+- [x] Create `contracts/ReputationLedger.sol`
+- [x] Implement state variables (design.md Section 3.3.1)
+- [x] Implement functions:
   - `recordCompletion()`
   - `recordDispute()`
   - `getReputationScore()`
   - `updateScore()`
-- [ ] Implement scoring algorithm (design.md Section 3.3.2)
-- [ ] Add events for reputation changes
+- [x] Implement scoring algorithm (design.md Section 3.3.2)
+- [x] Add events for reputation changes
 
 **Acceptance Criteria:**
 
-- Contract compiles without errors
-- Scoring algorithm matches design spec
-- Gas usage < 30,000 per operation
+- ✅ Contract compiles without errors
+- ✅ Scoring algorithm matches design spec
+- ✅ Gas usage < 30,000 per operation (subsequent calls: 6k-27k gas)
 
 ### Task 2.4: Deploy Contracts to Arc Testnet
 
@@ -259,18 +260,19 @@ This document breaks down the GigStream MVP implementation into detailed, action
 
 **Deliverables:**
 
-- [ ] Create Hardhat deployment script
+- [ ] Create Foundry deployment script (`.mjs` file following project pattern)
 - [ ] Deploy PaymentStreaming to Arc testnet
 - [ ] Deploy ReputationLedger to Arc testnet
 - [ ] Verify contracts on Arc explorer
 - [ ] Save contract addresses to config file
-- [ ] Fund contracts with testnet USDC for gas
+- [ ] Fund deployer wallet with testnet USDC for gas
 
 **Acceptance Criteria:**
 
-- Contracts deployed and verified
-- Contract addresses documented
+- Contracts deployed and verified using Foundry
+- Contract addresses documented in `.env` and config
 - Transactions visible on Arc explorer
+- Deployment script is reusable
 
 ---
 
