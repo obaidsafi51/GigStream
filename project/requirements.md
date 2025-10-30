@@ -586,10 +586,10 @@ GigStream is an AI-powered real-time payment streaming system for gig workers, b
 - **Requirements**:
   - Unit tests for business logic (target: 80% coverage)
   - Integration tests for API endpoints
-  - Smart contract tests (100% coverage for critical paths)
+  - Smart contract tests with Foundry (100% coverage for critical paths)
   - End-to-end tests for key user flows
   - Automated testing in CI/CD pipeline
-- **Measurement**: Test coverage reports, test execution time
+- **Measurement**: Test coverage reports (forge coverage for contracts, Jest/Vitest for backend/frontend), test execution time
 
 ---
 
@@ -601,6 +601,7 @@ GigStream is an AI-powered real-time payment streaming system for gig workers, b
 
 - **Blockchain**: Arc Testnet (Circle)
 - **Smart Contracts**: Solidity 0.8.20+
+- **Smart Contract Framework**: Foundry (forge, cast, anvil)
 - **Backend Runtime**: Node.js 18+ / Cloudflare Workers
 - **Database**: PostgreSQL 15+
 - **Caching**: Redis (if needed)
