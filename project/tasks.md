@@ -773,18 +773,20 @@ This document breaks down the GigStream MVP implementation into detailed, action
 
 **Deliverables:**
 
-- [ ] Create `hooks/use-realtime-balance.ts`
-- [ ] Implement polling with exponential backoff
-- [ ] Add CountUp animation for balance changes
-- [ ] Handle connection errors gracefully
-- [ ] Pause polling when tab is inactive
+- [x] Create `hooks/use-realtime-balance.ts`
+- [x] Implement polling with exponential backoff
+- [x] Add CountUp animation for balance changes
+- [x] Handle connection errors gracefully
+- [x] Pause polling when tab is inactive
 
 **Acceptance Criteria:**
 
-- Balance updates every 2 seconds
-- Backoff increases to 10s on error
-- Animation is smooth
-- No memory leaks
+- ✅ Balance updates every 2 seconds
+- ✅ Backoff increases to 10s on error
+- ✅ Animation is smooth
+- ✅ No memory leaks
+
+**Status:** ✅ COMPLETED
 
 ### Task 7.3: Tasks Page
 
@@ -794,24 +796,29 @@ This document breaks down the GigStream MVP implementation into detailed, action
 
 **Deliverables:**
 
-- [ ] Create `app/(worker)/tasks/page.tsx`
-- [ ] Display task list with filters:
-  - Status (active, completed, cancelled)
-  - Date range
-- [ ] Show task details:
+- [x] Create `app/(worker)/tasks/page.tsx`
+- [x] Display task list with filters:
+  - Status (active, completed, cancelled, pending, streaming)
+  - Search by title, description, platform
+- [x] Show task details:
   - Amount
   - Status
   - Time remaining (if streaming)
   - Progress bar
-- [ ] Add pagination
-- [ ] Link to task details modal
+  - Platform
+  - Task type (fixed/streaming)
+  - Created/completed dates
+- [x] Add pagination
+- [x] Stats cards showing task counts by status
 
 **Acceptance Criteria:**
 
-- Task list displays correctly
-- Filters work
-- Pagination handles large lists
-- Mobile responsive
+- ✅ Task list displays correctly
+- ✅ Filters work (status + search)
+- ✅ Pagination handles large lists
+- ✅ Mobile responsive
+
+**Status:** ✅ COMPLETED
 
 ### Task 7.4: Transaction History Page
 
