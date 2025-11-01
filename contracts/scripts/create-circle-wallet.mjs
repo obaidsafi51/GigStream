@@ -107,12 +107,9 @@ async function createWallet() {
 
       console.log(`\n${colors.cyan}Next Steps:${colors.reset}`);
       console.log("  1. Save this wallet address");
-      console.log("  2. Request testnet USDC: https://faucet.circle.com/");
+      console.log("  2. Request testnet USDC (Arc uses USDC as native token): https://faucet.circle.com/");
       console.log(
-        "  3. Request testnet ETH: https://faucet.circle.com/arc-testnet"
-      );
-      console.log(
-        "  4. Run verification: node contracts/scripts/test-circle-wallet.mjs\n"
+        "  3. Run verification: node contracts/scripts/test-circle-wallet.mjs\n"
       );
     } else {
       logError("Wallet creation failed");

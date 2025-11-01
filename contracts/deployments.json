@@ -1,0 +1,17 @@
+{
+  "network": "arc-testnet",
+  "chainId": "5042002",
+  "timestamp": "2025-11-01T05:14:22.479Z",
+  "deployer": "0xa8b28f81726cbf47379669163a9dbe64626d6d43",
+  "usdcToken": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+  "contracts": {
+    "ReputationLedger": {
+      "address": "0xbc1ec3a376126d943a5be1370e4208bafc2d6482",
+      "txHash": "0x50756fffa9c0edba5f5952305101a06edf640100c06b5e28fba525dbf47f847e"
+    },
+    "PaymentStreaming": {
+      "address": "0x1ab2a328642e0c682ea079ea8821e0efcd378d42",
+      "txHash": "0xd9300975ec9076c758123a1427d7640884c84c7cc5343b475384ef10eb4beb8a"
+    }
+  }
+}

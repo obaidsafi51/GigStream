@@ -70,7 +70,7 @@ fs.writeFileSync(envPath, updatedContent);
 console.log(`${colors.green}✓ .env file updated${colors.reset}\n`);
 
 console.log(`${colors.cyan}Next Steps:${colors.reset}`);
-console.log(`  1. Request testnet ETH for gas fees:`);
+console.log(`  1. Request testnet USDC for gas fees (Arc uses USDC as native token):`);
 console.log(`     https://faucet.circle.com/arc-testnet`);
 console.log(`     Address: ${wallet.address}`);
 console.log(`  2. Test Arc connection:`);
