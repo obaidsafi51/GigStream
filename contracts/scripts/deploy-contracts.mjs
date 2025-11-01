@@ -255,6 +255,10 @@ async function saveDeploymentInfo(deployments) {
     /CONTRACT_REPUTATION_LEDGER=.*/,
     `CONTRACT_REPUTATION_LEDGER=${deployments.ReputationLedger.address}`
   );
+  updatedContent = updatedContent.replace(
+    /CONTRACT_MICRO_LOAN=.*/,
+    `CONTRACT_MICRO_LOAN=${deployments.MicroLoan.address}`
+  );
 
   fs.writeFileSync(envPath, updatedContent);
   logSuccess(".env file updated with contract addresses");
@@ -281,6 +285,7 @@ async function saveDeploymentInfo(deployments) {
 export const CONTRACTS = {
   PaymentStreaming: "${deployments.PaymentStreaming.address}",
   ReputationLedger: "${deployments.ReputationLedger.address}",
+  MicroLoan: "${deployments.MicroLoan.address}",
   USDCToken: "${ARC_TESTNET_USDC}",
 } as const;
 
@@ -327,10 +332,21 @@ async function main() {
     ]);
     deployments.PaymentStreaming = paymentStreaming;
 
+    // Deploy MicroLoan (requires USDC address and ReputationLedger address)
+    const microLoan = await deployContract("MicroLoan", [
+      ARC_TESTNET_USDC,
+      reputationLedger.address,
+    ]);
+    deployments.MicroLoan = microLoan;
+
     // Step 4: Verify contracts (optional)
     await verifyContract(reputationLedger.address, "ReputationLedger");
     await verifyContract(paymentStreaming.address, "PaymentStreaming", [
       ARC_TESTNET_USDC,
+    ]);
+    await verifyContract(microLoan.address, "MicroLoan", [
+      ARC_TESTNET_USDC,
+      reputationLedger.address,
     ]);
 
     // Step 5: Save deployment info
@@ -345,6 +361,7 @@ async function main() {
     log("─────────────────────────────────────────────", "cyan");
     log(`PaymentStreaming:  ${deployments.PaymentStreaming.address}`, "green");
     log(`ReputationLedger:  ${deployments.ReputationLedger.address}`, "green");
+    log(`MicroLoan:         ${deployments.MicroLoan.address}`, "green");
     log(`USDC Token:        ${ARC_TESTNET_USDC}`, "yellow");
     log("─────────────────────────────────────────────", "cyan");
 
@@ -357,15 +374,19 @@ async function main() {
       `ReputationLedger: https://explorer.testnet.arc.network/address/${deployments.ReputationLedger.address}`,
       "blue"
     );
+    log(
+      `MicroLoan:        https://explorer.testnet.arc.network/address/${deployments.MicroLoan.address}`,
+      "blue"
+    );
 
     log("\n📝 Next Steps:", "cyan");
     log("  1. Verify contracts on Arc Explorer (if available)", "reset");
     log("  2. Test contract interactions:", "reset");
     log("     node contracts/scripts/test-deployed-contracts.mjs", "yellow");
-    log("  3. Move to Task 3.1: MicroLoan Contract Development", "reset");
+    log("  3. Fund MicroLoan contract with USDC for lending", "reset");
     log("  4. Update backend to use deployed contract addresses", "reset");
 
-    log("\n✨ Task 2.4 COMPLETED!", "green");
+    log("\n✨ Task 3.2 COMPLETED!", "green");
     log("", "reset");
   } catch (error) {
     log("\n╔═══════════════════════════════════════════╗", "red");

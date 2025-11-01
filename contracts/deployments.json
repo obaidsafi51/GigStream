@@ -12,6 +12,10 @@
     "PaymentStreaming": {
       "address": "0x1ab2a328642e0c682ea079ea8821e0efcd378d42",
       "txHash": "0xd9300975ec9076c758123a1427d7640884c84c7cc5343b475384ef10eb4beb8a"
+    },
+    "MicroLoan": {
+      "address": "0x176887591fBeD5a16E9F178779046ACdd5c9e000",
+      "txHash": "0x0af7be6e0c2afe8b8b77a952f61cf3e62d51f08982dd5d6de33c9c66914d7089"
     }
   }
 }

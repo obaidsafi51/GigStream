@@ -4,10 +4,14 @@ pragma solidity ^0.8.20;
 import "forge-std/Script.sol";
 import "../src/PaymentStreaming.sol";
 import "../src/ReputationLedger.sol";
+import "../src/MicroLoan.sol";
 
 /**
  * @title Deploy Script for GigStream Contracts
- * @notice Deploys PaymentStreaming and ReputationLedger contracts to Arc testnet
+ * @notice Deploys all three smart contracts to Arc testnet:
+ *         - ReputationLedger
+ *         - PaymentStreaming
+ *         - MicroLoan
  * 
  * Usage:
  *   forge script script/Deploy.s.sol:DeployScript --rpc-url $ARC_RPC_URL --broadcast --legacy
@@ -39,6 +43,13 @@ contract DeployScript is Script {
         PaymentStreaming paymentStreaming = new PaymentStreaming(ARC_USDC);
         console.log("PaymentStreaming deployed at:", address(paymentStreaming));
         
+        // Deploy MicroLoan (requires USDC address and ReputationLedger address)
+        console.log("\nDeploying MicroLoan...");
+        console.log("Using USDC token:", ARC_USDC);
+        console.log("Using ReputationLedger:", address(reputationLedger));
+        MicroLoan microLoan = new MicroLoan(ARC_USDC, address(reputationLedger));
+        console.log("MicroLoan deployed at:", address(microLoan));
+        
         vm.stopBroadcast();
         
         // Log deployment summary
@@ -47,6 +58,7 @@ contract DeployScript is Script {
         console.log("================================");
         console.log("ReputationLedger:", address(reputationLedger));
         console.log("PaymentStreaming:", address(paymentStreaming));
+        console.log("MicroLoan:", address(microLoan));
         console.log("USDC Token:", ARC_USDC);
         console.log("================================");
         
