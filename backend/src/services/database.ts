@@ -109,6 +109,16 @@ export const queries = {
   },
 
   /**
+   * Get platform analytics with detailed metrics
+   * Uses the analytics service for comprehensive data
+   */
+  async getPlatformAnalytics(prisma: PrismaClient, platformId: string, days: number = 30) {
+    // Import dynamically to avoid circular dependencies
+    const { getPlatformAnalyticsWithCache } = await import('./analytics.js');
+    return getPlatformAnalyticsWithCache(prisma, platformId, 300); // 5 minute cache
+  },
+
+  /**
    * Get active payment streams
    */
   async getActiveStreams(prisma: PrismaClient) {
