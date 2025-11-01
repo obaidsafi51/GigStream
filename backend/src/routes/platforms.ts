@@ -7,6 +7,8 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { authenticateAPIKey } from '../middleware/auth';
 import { validateRequest } from '../middleware/validation';
+import { getPrisma } from '../services/database.js';
+import { getPlatformAnalyticsWithCache } from '../services/analytics.js';
 
 const platformsRoutes = new Hono();
 
@@ -128,21 +130,84 @@ platformsRoutes.get('/:platformId/workers', authenticateAPIKey, async (c) => {
 
 /**
  * GET /api/v1/platforms/:platformId/analytics
- * Get platform analytics (payment volume, retention, etc.)
+ * Get platform analytics with comprehensive metrics and time series data
+ * 
+ * Features:
+ * - Total payouts, tasks completed, unique workers
+ * - Average payment time and rating
+ * - Time series data for charts
+ * - 5-minute caching for performance
+ * 
+ * Query params:
+ * - days: number of days for time series (default: 30, max: 90)
+ * 
+ * Performance:
+ * - Target: <500ms response time
+ * - Cached responses: <50ms
+ * - Cache duration: 5 minutes (300s)
  */
 platformsRoutes.get('/:platformId/analytics', authenticateAPIKey, async (c) => {
-  const platformId = c.req.param('platformId');
-  const startDate = c.req.query('startDate');
-  const endDate = c.req.query('endDate');
-  
-  // TODO: Implement analytics aggregation
-  return c.json({
-    success: false,
-    error: {
-      code: 'NOT_IMPLEMENTED',
-      message: 'Analytics endpoint to be implemented',
-    },
-  }, 501);
+  try {
+    const platformId = c.req.param('platformId');
+    
+    // Parse query parameters
+    const daysParam = c.req.query('days');
+    const days = daysParam ? parseInt(daysParam, 10) : 30;
+    
+    // Validate days parameter
+    if (isNaN(days) || days < 1 || days > 90) {
+      return c.json({
+        success: false,
+        error: {
+          code: 'INVALID_PARAMETER',
+          message: 'Days parameter must be between 1 and 90',
+        },
+      }, 400);
+    }
+
+    // Get Prisma client
+    const prisma = getPrisma();
+
+    // Get analytics with caching (5 minutes = 300 seconds)
+    const startTime = Date.now();
+    const analytics = await getPlatformAnalyticsWithCache(prisma, platformId, 300);
+    const responseTime = Date.now() - startTime;
+
+    // Return analytics data
+    return c.json({
+      success: true,
+      data: analytics,
+      meta: {
+        responseTime: `${responseTime}ms`,
+        cached: responseTime < 100, // Likely cached if very fast
+      },
+    }, 200);
+
+  } catch (error: any) {
+    // Handle specific errors
+    if (error.message?.includes('not found')) {
+      return c.json({
+        success: false,
+        error: {
+          code: 'PLATFORM_NOT_FOUND',
+          message: `Platform with ID ${c.req.param('platformId')} does not exist`,
+        },
+      }, 404);
+    }
+
+    // Log error for debugging
+    console.error('Platform analytics error:', error);
+
+    // Return generic error
+    return c.json({
+      success: false,
+      error: {
+        code: 'ANALYTICS_ERROR',
+        message: 'Failed to calculate platform analytics',
+        details: error.message,
+      },
+    }, 500);
+  }
 });
 
 /**
