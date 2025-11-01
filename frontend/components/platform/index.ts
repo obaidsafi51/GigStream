@@ -7,3 +7,4 @@
 export { PlatformSidebar } from "./sidebar";
 export { PlatformMobileSidebar } from "./mobile-sidebar";
 export { PlatformStatsHeader } from "./stats-header";
+export { default as WorkerDetailModal } from "./worker-detail-modal";
