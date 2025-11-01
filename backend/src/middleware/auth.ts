@@ -5,12 +5,17 @@
 
 import { Context, Next } from 'hono';
 import { getCookie } from 'hono/cookie';
+import { verifyToken, hashApiKey } from '../services/auth';
+import { PrismaClient } from '@prisma/client';
+
+// Initialize Prisma client
+const prisma = new PrismaClient();
 
 /**
  * Authenticate JWT token
  * Used for worker endpoints
  */
-export async function authenticateJWT(c: Context, next: Next) {
+export async function authenticateJWT(c: Context, next: Next): Promise<Response | void> {
   // Get token from Authorization header or cookie
   const authHeader = c.req.header('Authorization');
   const token = authHeader?.startsWith('Bearer ')
@@ -31,30 +36,50 @@ export async function authenticateJWT(c: Context, next: Next) {
   }
 
   try {
-    // TODO: Implement JWT verification (Task 3.4)
-    // 1. Verify JWT signature
-    // 2. Check expiration
-    // 3. Extract user info
-    // 4. Attach to context
+    // Verify JWT signature and decode payload
+    const payload = verifyToken(token);
     
-    // For now, return not implemented
-    return c.json(
-      {
-        success: false,
-        error: {
-          code: 'NOT_IMPLEMENTED',
-          message: 'JWT authentication will be implemented in Task 3.4',
+    if (!payload) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: 'INVALID_TOKEN',
+            message: 'Invalid or expired token',
+          },
         },
-      },
-      501
-    );
+        401
+      );
+    }
+
+    // Check token type (must be worker for this middleware)
+    if (payload.type !== 'worker') {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: 'INVALID_TOKEN_TYPE',
+            message: 'Worker token required',
+          },
+        },
+        403
+      );
+    }
+
+    // Attach user info to context for use in routes
+    c.set('userId', payload.sub);
+    c.set('userType', payload.type);
+    c.set('walletAddress', payload.wallet);
+
+    await next();
   } catch (error) {
     return c.json(
       {
         success: false,
         error: {
-          code: 'INVALID_TOKEN',
-          message: 'Invalid or expired token',
+          code: 'AUTHENTICATION_ERROR',
+          message: 'Authentication failed',
+          details: error instanceof Error ? error.message : 'Unknown error',
         },
       },
       401
@@ -66,7 +91,7 @@ export async function authenticateJWT(c: Context, next: Next) {
  * Authenticate API key
  * Used for platform endpoints
  */
-export async function authenticateAPIKey(c: Context, next: Next) {
+export async function authenticateAPIKey(c: Context, next: Next): Promise<Response | void> {
   const apiKey = c.req.header('X-API-Key');
 
   if (!apiKey) {
@@ -83,33 +108,47 @@ export async function authenticateAPIKey(c: Context, next: Next) {
   }
 
   try {
-    // TODO: Implement API key validation (Task 3.4)
-    // 1. Hash provided key
-    // 2. Look up in database
-    // 3. Check expiration and permissions
-    // 4. Attach platform info to context
+    // Hash the provided API key
+    const apiKeyHash = await hashApiKey(apiKey);
     
-    // For now, return not implemented
-    return c.json(
-      {
-        success: false,
-        error: {
-          code: 'NOT_IMPLEMENTED',
-          message: 'API key authentication will be implemented in Task 3.4',
-        },
+    // Look up platform by API key hash
+    const platform = await prisma.platform.findFirst({
+      where: {
+        api_key_hash: apiKeyHash,
+        is_active: true,
       },
-      501
-    );
+    });
+
+    if (!platform) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: 'INVALID_API_KEY',
+            message: 'Invalid or inactive API key',
+          },
+        },
+        401
+      );
+    }
+
+    // Attach platform info to context
+    c.set('platformId', platform.id);
+    c.set('platformName', platform.name);
+    c.set('userType', 'platform');
+
+    await next();
   } catch (error) {
     return c.json(
       {
         success: false,
         error: {
-          code: 'INVALID_API_KEY',
-          message: 'Invalid API key',
+          code: 'AUTHENTICATION_ERROR',
+          message: 'API key validation failed',
+          details: error instanceof Error ? error.message : 'Unknown error',
         },
       },
-      401
+      500
     );
   }
 }
