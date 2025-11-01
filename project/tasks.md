@@ -256,23 +256,52 @@ This document breaks down the GigStream MVP implementation into detailed, action
 
 **Owner:** BE  
 **Time:** 1 hour  
-**Dependencies:** Tasks 2.1, 2.2, 2.3
+**Dependencies:** Tasks 2.1, 2.2, 2.3  
+**Status:** ✅ COMPLETED (November 1, 2025)
+
+**Deployed Addresses:**
+- **PaymentStreaming:** `0x1ab2a328642e0c682ea079ea8821e0efcd378d42`
+- **ReputationLedger:** `0xbc1ec3a376126d943a5be1370e4208bafc2d6482`
+- **Arc Testnet USDC:** `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238`
+- **Deployer:** `0xA8b28f81726cBF47379669163a9DBE64626D6D43`
+- **Total Gas Used:** 2,468,902 gas (~0.407 USDC)
+- **Deployment Transactions:**
+  - ReputationLedger: [`0x50756fff...`](https://testnet.arcscan.app/tx/0x50756fffa9c0edba5f5952305101a06edf640100c06b5e28fba525dbf47f847e)
+  - PaymentStreaming: [`0xd9300975...`](https://testnet.arcscan.app/tx/0xd9300975ec9076c758123a1427d7640884c84c7cc5343b475384ef10eb4beb8a)
 
 **Deliverables:**
 
-- [ ] Create Foundry deployment script (`.mjs` file following project pattern)
-- [ ] Deploy PaymentStreaming to Arc testnet
-- [ ] Deploy ReputationLedger to Arc testnet
-- [ ] Verify contracts on Arc explorer
-- [ ] Save contract addresses to config file
-- [ ] Fund deployer wallet with testnet USDC for gas
+- [x] Create Foundry deployment script (`.mjs` file following project pattern)
+- [x] Deploy PaymentStreaming to Arc testnet
+- [x] Deploy ReputationLedger to Arc testnet
+- [x] Verify contracts on Arc explorer
+- [x] Save contract addresses to config file
+- [x] Fund deployer wallet with testnet USDC for gas
 
 **Acceptance Criteria:**
 
-- Contracts deployed and verified using Foundry
-- Contract addresses documented in `.env` and config
-- Transactions visible on Arc explorer
-- Deployment script is reusable
+- ✅ Contracts deployed and verified using Foundry
+- ✅ Contract addresses documented in `.env` and config
+- ✅ Transactions visible on Arc explorer
+- ✅ Deployment script is reusable
+
+**Deliverables Created:**
+
+- `contracts/scripts/deploy-contracts.mjs` - Comprehensive deployment automation
+- `contracts/scripts/test-deployed-contracts.mjs` - Post-deployment verification
+- `contracts/deployments.json` - Auto-generated deployment config (after deployment)
+- `frontend/lib/contracts.ts` - TypeScript config for frontend (auto-generated)
+- `summary/TASK_2.4_COMPLETED.md` - Full completion report
+
+**Usage:**
+
+```bash
+# Deploy contracts
+node contracts/scripts/deploy-contracts.mjs
+
+# Test deployed contracts
+node contracts/scripts/test-deployed-contracts.mjs
+```
 
 ---
 
@@ -847,8 +876,6 @@ This document breaks down the GigStream MVP implementation into detailed, action
 - ✅ Mobile responsive
 
 **Status:** ✅ COMPLETED
-
-
 
 ## Day 8: Worker Dashboard (Part 2) - Advance & Reputation
 

@@ -2,7 +2,7 @@
 
 /**
  * Arc Testnet Faucet Guide
- * Get testnet USDC and ETH on Arc testnet
+ * Get testnet USDC on Arc testnet (Arc uses USDC as native token for gas)
  */
 
 import dotenv from "dotenv";

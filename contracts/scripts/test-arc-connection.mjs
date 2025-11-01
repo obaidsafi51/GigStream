@@ -135,15 +135,15 @@ async function testArcConnection() {
     const balance = await provider.getBalance(address);
     const balanceInEth = ethers.formatEther(balance);
 
-    console.log(`  Balance: ${balanceInEth} ETH`);
+    console.log(`  Balance: ${balanceInEth} USDC (Arc native token)`);
 
     if (balance > 0n) {
       logSuccess("Wallet has funds for gas fees");
     } else {
       logWarning("Wallet has ZERO balance!");
-      logInfo("You need testnet ETH for gas fees to deploy contracts");
+      logInfo("You need testnet USDC for gas fees to deploy contracts (Arc uses USDC as native token)");
       console.log(
-        "  Get testnet ETH from: https://faucet.circle.com/arc-testnet"
+        "  Get testnet USDC from: https://faucet.circle.com/arc-testnet"
       );
     }
   } catch (error) {
@@ -200,7 +200,7 @@ async function testArcConnection() {
     "Your Arc testnet connection is ready for smart contract deployment!"
   );
   console.log("\nNext steps:");
-  console.log("  1. Ensure deployer wallet has testnet ETH for gas");
+  console.log("  1. Ensure deployer wallet has testnet USDC for gas (Arc uses USDC as native token)");
   console.log(
     "  2. Test Circle API connection: node contracts/scripts/test-circle-wallet.mjs"
   );
