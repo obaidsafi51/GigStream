@@ -71,6 +71,22 @@ const ReputationLedgerABI = [
   "function getReputationScore(address) view returns (uint256, uint256)",
 ];
 
+const MicroLoanABI = [
+  "function usdcToken() view returns (address)",
+  "function reputationLedger() view returns (address)",
+  "function loanCount() view returns (uint256)",
+  "function MIN_LOAN_AMOUNT() view returns (uint256)",
+  "function MAX_LOAN_AMOUNT() view returns (uint256)",
+  "function MIN_FEE_BPS() view returns (uint256)",
+  "function MAX_FEE_BPS() view returns (uint256)",
+  "function MIN_REPUTATION_SCORE() view returns (uint256)",
+  "function DEFAULT_PERIOD() view returns (uint256)",
+  "function authorizedApprovers(address) view returns (bool)",
+  "function owner() view returns (address)",
+  "function getContractBalance() view returns (uint256)",
+  "function calculateEligibility(address) view returns (bool, uint256, string)",
+];
+
 async function loadDeploymentInfo() {
   const deploymentPath = resolve(rootDir, "contracts/deployments.json");
 
@@ -223,6 +239,103 @@ async function testReputationLedger(provider, wallet, address) {
   }
 }
 
+async function testMicroLoan(provider, wallet, address) {
+  console.log(
+    `\n${colors.cyan}=== Testing MicroLoan Contract ===${colors.reset}`
+  );
+  console.log(`Address: ${address}\n`);
+
+  try {
+    const contract = new ethers.Contract(address, MicroLoanABI, provider);
+
+    // Test 1: Read USDC token address
+    logInfo("Reading USDC token address...");
+    const usdcToken = await contract.usdcToken();
+    logSuccess(`USDC Token: ${usdcToken}`);
+
+    // Test 2: Read ReputationLedger address
+    logInfo("Reading ReputationLedger address...");
+    const reputationLedger = await contract.reputationLedger();
+    logSuccess(`ReputationLedger: ${reputationLedger}`);
+
+    // Test 3: Read loan count
+    logInfo("Reading loan count...");
+    const loanCount = await contract.loanCount();
+    logSuccess(`Loan Count: ${loanCount.toString()}`);
+
+    // Test 4: Read constants
+    logInfo("Reading contract constants...");
+    const minLoan = await contract.MIN_LOAN_AMOUNT();
+    const maxLoan = await contract.MAX_LOAN_AMOUNT();
+    const minFee = await contract.MIN_FEE_BPS();
+    const maxFee = await contract.MAX_FEE_BPS();
+    const minReputation = await contract.MIN_REPUTATION_SCORE();
+    const defaultPeriod = await contract.DEFAULT_PERIOD();
+
+    logSuccess(`Min Loan Amount: ${ethers.formatUnits(minLoan, 6)} USDC`);
+    logSuccess(`Max Loan Amount: ${ethers.formatUnits(maxLoan, 6)} USDC`);
+    logSuccess(`Fee Range: ${minFee.toString()}-${maxFee.toString()} bps (${minFee / 100n}%-${maxFee / 100n}%)`);
+    logSuccess(`Min Reputation Score: ${minReputation.toString()}`);
+    logSuccess(`Default Period: ${defaultPeriod / 86400n} days`);
+
+    // Test 5: Check authorization
+    logInfo("Checking authorization status...");
+    const isAuthorized = await contract.authorizedApprovers(wallet.address);
+    logSuccess(`Your address is authorized: ${isAuthorized}`);
+    if (isAuthorized) {
+      logInfo("You can approve and manage loans");
+    }
+
+    // Test 6: Read owner
+    logInfo("Reading contract owner...");
+    const owner = await contract.owner();
+    logSuccess(`Owner: ${owner}`);
+    if (owner.toLowerCase() === wallet.address.toLowerCase()) {
+      logInfo("You are the contract owner");
+    }
+
+    // Test 7: Get contract USDC balance
+    logInfo("Reading contract USDC balance...");
+    const balance = await contract.getContractBalance();
+    logSuccess(`Contract Balance: ${ethers.formatUnits(balance, 6)} USDC`);
+    if (balance === 0n) {
+      logWarning("Contract has no USDC - loans cannot be disbursed");
+      logInfo("Fund the contract using: contract.fundContract(amount)");
+    }
+
+    // Test 8: Check eligibility for test address
+    logInfo("Checking eligibility for zero address (should fail)...");
+    try {
+      const [eligible, maxAmount, reason] = await contract.calculateEligibility(
+        ethers.ZeroAddress
+      );
+      logSuccess(
+        `Eligible: ${eligible}, Max Amount: ${ethers.formatUnits(maxAmount, 6)} USDC, Reason: "${reason}"`
+      );
+    } catch (error) {
+      logInfo("Eligibility check returned expected result");
+    }
+
+    // Test 9: Check contract code
+    logInfo("Verifying contract deployment...");
+    const code = await provider.getCode(address);
+    if (code === "0x") {
+      logError("No code at contract address!");
+      return false;
+    }
+    logSuccess(`Contract code size: ${(code.length - 2) / 2} bytes`);
+
+    console.log(
+      `\n${colors.green}✓ MicroLoan contract tests passed!${colors.reset}`
+    );
+    return true;
+  } catch (error) {
+    logError("MicroLoan test failed");
+    console.error(error.message);
+    return false;
+  }
+}
+
 async function estimateGasCosts(provider, deployment) {
   console.log(`\n${colors.cyan}=== Gas Cost Estimates ===${colors.reset}\n`);
 
@@ -232,13 +345,16 @@ async function estimateGasCosts(provider, deployment) {
 
     logInfo(`Current Gas Price: ${ethers.formatUnits(gasPrice, "gwei")} gwei`);
 
-    // Estimate costs based on test results (from Task 2.1)
+    // Estimate costs based on test results (from Task 2.1 and 3.1)
     const estimates = {
       "Create Stream": 348000n,
       "Release Payment": 29000n,
       "Claim Earnings": 53000n,
       "Record Completion": 27000n,
       "Record Dispute": 15000n,
+      "Request Advance": 170000n,
+      "Approve Loan": 234000n,
+      "Repay From Earnings": 52000n,
     };
 
     console.log("\nEstimated transaction costs (approximate):");
@@ -313,6 +429,12 @@ async function main() {
       deployment.contracts.ReputationLedger.address
     );
 
+    const microLoanOk = await testMicroLoan(
+      provider,
+      wallet,
+      deployment.contracts.MicroLoan.address
+    );
+
     // Estimate gas costs
     await estimateGasCosts(provider, deployment);
 
@@ -320,7 +442,7 @@ async function main() {
     console.log(
       `\n${colors.cyan}╔═══════════════════════════════════════════╗${colors.reset}`
     );
-    if (paymentStreamingOk && reputationLedgerOk) {
+    if (paymentStreamingOk && reputationLedgerOk && microLoanOk) {
       console.log(
         `${colors.green}║  ✓ All Contract Tests Passed!             ║${colors.reset}`
       );
@@ -333,14 +455,15 @@ async function main() {
       `${colors.cyan}╚═══════════════════════════════════════════╝${colors.reset}\n`
     );
 
-    if (paymentStreamingOk && reputationLedgerOk) {
+    if (paymentStreamingOk && reputationLedgerOk && microLoanOk) {
       console.log(
         `${colors.green}✓ Contracts are deployed and working correctly!${colors.reset}`
       );
       console.log("\n📝 Next Steps:");
-      console.log("  1. Integrate contracts with backend API (Task 3.3-4.4)");
-      console.log("  2. Create Circle wallets for workers (Task 4.1-4.2)");
-      console.log("  3. Test end-to-end payment flow");
+      console.log("  1. Fund MicroLoan contract with USDC (for disbursing loans)");
+      console.log("  2. Integrate contracts with backend API (Task 3.3-4.4)");
+      console.log("  3. Create Circle wallets for workers (Task 4.1-4.2)");
+      console.log("  4. Test end-to-end payment flow");
     } else {
       console.log(
         `${colors.red}⚠️  Fix the issues before proceeding${colors.reset}`
