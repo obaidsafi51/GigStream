@@ -1,0 +1,32 @@
+# Cloudflare Workers Configuration
+# https://developers.cloudflare.com/workers/wrangler/configuration/
+
+name = "gigstream-api"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+node_compat = true
+
+# Account and workers.dev subdomain
+# workers_dev = true
+# account_id = "your-account-id"
+
+# Route configuration (when deploying to custom domain)
+# routes = [
+#   { pattern = "api.gigstream.com/*", zone_name = "gigstream.com" }
+# ]
+
+# Environment variables (use `wrangler secret put` for sensitive values)
+[env.production]
+name = "gigstream-api-production"
+
+[env.staging]
+name = "gigstream-api-staging"
+
+# Database bindings (Neon PostgreSQL via HTTP)
+# [env.production.vars]
+# DATABASE_URL = "postgresql://..."
+
+# Service bindings
+# [[services]]
+# binding = "MY_SERVICE"
+# service = "my-service-name"
