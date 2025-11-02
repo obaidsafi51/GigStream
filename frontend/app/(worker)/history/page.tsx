@@ -25,7 +25,7 @@ interface Transaction {
 
 // Mock data for transaction history
 function getMockTransactions(): Transaction[] {
-  const baseUrl = process.env.NEXT_PUBLIC_ARC_EXPLORER_URL || "https://explorer.circle.com/arc-testnet";
+  const baseUrl = process.env.NEXT_PUBLIC_ARC_EXPLORER_URL || "https://testnet.arcscan.app";
   
   return [
     {
