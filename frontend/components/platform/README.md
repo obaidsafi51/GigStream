@@ -48,6 +48,32 @@ Quick stats overview header for platform admins.
 - Responsive grid layout
 - Change indicators
 
+### `worker-detail-modal.tsx`
+Modal dialog displaying comprehensive worker information.
+
+**Features:**
+- Full worker profile display
+- Reputation score visualization
+- Performance metrics breakdown
+- Wallet information with explorer links
+- Responsive design
+
+**Props:**
+- `worker` - Worker data object
+- `isOpen` - Boolean to control modal visibility
+- `onClose` - Callback when modal is closed
+
+**Usage:**
+```tsx
+import WorkerDetailModal from "@/components/platform/worker-detail-modal";
+
+<WorkerDetailModal
+  worker={selectedWorker}
+  isOpen={!!selectedWorker}
+  onClose={() => setSelectedWorker(null)}
+/>
+```
+
 **Metrics:**
 - Total Payouts
 - Active Workers
