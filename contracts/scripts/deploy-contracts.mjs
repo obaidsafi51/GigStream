@@ -217,7 +217,7 @@ async function verifyContract(
   logWarning("Contract verification on Arc testnet may not be available yet");
   logInfo(`Contract Address: ${contractAddress}`);
   logInfo(
-    `View on Explorer: https://explorer.testnet.arc.network/address/${contractAddress}`
+    `View on Explorer: https://testnet.arcscan.app/address/${contractAddress}`
   );
 
   // Uncomment when verification is available:
@@ -289,11 +289,10 @@ export const CONTRACTS = {
   USDCToken: "${ARC_TESTNET_USDC}",
 } as const;
 
-export const NETWORK = {
-  chainId: ${process.env.ARC_CHAIN_ID || "5042002"},
+  chainId: ARC_CHAIN_ID,
   name: "Arc Testnet",
-  rpcUrl: "${process.env.ARC_RPC_URL}",
-  explorerUrl: "https://explorer.testnet.arc.network",
+  rpcUrl: ARC_RPC_URL,
+  explorerUrl: "https://testnet.arcscan.app",
 } as const;
 `;
 
@@ -367,15 +366,15 @@ async function main() {
 
     log("\n🔗 Explorer Links:", "cyan");
     log(
-      `PaymentStreaming: https://explorer.testnet.arc.network/address/${deployments.PaymentStreaming.address}`,
+      `PaymentStreaming: https://testnet.arcscan.app/address/${deployments.PaymentStreaming.address}`,
       "blue"
     );
     log(
-      `ReputationLedger: https://explorer.testnet.arc.network/address/${deployments.ReputationLedger.address}`,
+      `ReputationLedger: https://testnet.arcscan.app/address/${deployments.ReputationLedger.address}`,
       "blue"
     );
     log(
-      `MicroLoan:        https://explorer.testnet.arc.network/address/${deployments.MicroLoan.address}`,
+      `MicroLoan:        https://testnet.arcscan.app/address/${deployments.MicroLoan.address}`,
       "blue"
     );
 

@@ -15,6 +15,7 @@
     "db:reset": "prisma migrate reset"
   },
   "dependencies": {
+    "@circle-fin/developer-controlled-wallets": "^9.2.0",
     "@neondatabase/serverless": "^0.9.5",
     "@prisma/adapter-neon": "^5.20.0",
     "@prisma/client": "^6.18.0",

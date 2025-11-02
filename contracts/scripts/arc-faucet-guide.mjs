@@ -38,9 +38,9 @@ const wallet = new Wallet(deployerKey);
 const deployerAddress = wallet.address;
 
 console.log(`${colors.cyan}📍 Arc Testnet Details:${colors.reset}`);
-console.log(`  Chain ID: 613`);
-console.log(`  RPC URL: https://arc-testnet.rpc.circle.com`);
-console.log(`  Explorer: https://explorer.circle.com/arc-testnet\n`);
+console.log(`  Chain ID: 5042002`);
+console.log(`  RPC URL: https://rpc.testnet.arc.network`);
+console.log(`  Explorer: https://testnet.arcscan.app\n`);
 
 console.log(`${colors.cyan}Your Deployer Address:${colors.reset}`);
 console.log(`  ${colors.green}${deployerAddress}${colors.reset}\n`);
@@ -80,7 +80,7 @@ console.log(
 );
 console.log(`2. Check on Arc explorer:`);
 console.log(
-  `   ${colors.green}https://explorer.circle.com/arc-testnet/address/${deployerAddress}${colors.reset}\n`
+  `   ${colors.green}https://testnet.arcscan.app/address/${deployerAddress}${colors.reset}\n`
 );
 console.log(`3. Mark Task 1.3 as complete in tasks.md\n`);
 console.log(`4. Move to Task 1.4: Database Schema Implementation\n`);
