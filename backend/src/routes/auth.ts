@@ -17,6 +17,7 @@ import {
   generateApiKey,
   hashApiKey,
 } from '../services/auth';
+import { createWallet } from '../services/circle';
 
 const authRoutes = new Hono();
 const prisma = new PrismaClient();
@@ -89,12 +90,48 @@ authRoutes.post('/register', validateRequest(registerSchema), async (c) => {
       // Hash password
       const passwordHash = await hashPassword(password);
 
-      // Create worker (wallet creation will be done in Task 4.2)
+      // Create Circle wallet for the worker
+      let walletId: string | undefined;
+      let walletAddress: string | undefined;
+      
+      try {
+        const startTime = Date.now();
+        console.log(`Creating Circle wallet for worker: ${email}`);
+        
+        const wallet = await createWallet(email);
+        walletId = wallet.walletId;
+        walletAddress = wallet.address !== 'pending' ? wallet.address : undefined;
+        
+        const elapsedTime = Date.now() - startTime;
+        console.log(`✓ Wallet created in ${elapsedTime}ms`);
+        
+        if (elapsedTime > 2000) {
+          console.warn(`⚠ Wallet creation took ${elapsedTime}ms (target: <2s)`);
+        }
+      } catch (walletError) {
+        console.error('Failed to create Circle wallet:', walletError);
+        // Return error - wallet creation is critical for worker registration
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: 'WALLET_CREATION_FAILED',
+              message: 'Failed to create wallet for worker',
+              details: walletError instanceof Error ? walletError.message : 'Unknown error',
+            },
+          },
+          500
+        );
+      }
+
+      // Create worker with wallet information
       const worker = await prisma.worker.create({
         data: {
           email,
           password_hash: passwordHash,
           name,
+          wallet_id: walletId,
+          wallet_address: walletAddress,
           reputation_score: 500, // Base score
           account_age_days: 0,
           completion_rate: 0,
