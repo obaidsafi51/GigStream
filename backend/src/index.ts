@@ -15,6 +15,7 @@ import authRoutes from './routes/auth';
 import workersRoutes from './routes/workers';
 import platformsRoutes from './routes/platforms';
 import webhooksRoutes from './routes/webhooks';
+import demoRoutes from './routes/demo';
 
 // Import middleware
 import { errorHandler } from './middleware/errorHandler';
@@ -72,6 +73,7 @@ app.route('/api/v1/auth', authRoutes);
 app.route('/api/v1/workers', workersRoutes);
 app.route('/api/v1/platforms', platformsRoutes);
 app.route('/api/v1/webhooks', webhooksRoutes);
+app.route('/api/v1/demo', demoRoutes);
 
 // 404 handler
 app.notFound((c) => {
