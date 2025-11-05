@@ -6,10 +6,7 @@
 import { Context, Next } from 'hono';
 import { getCookie } from 'hono/cookie';
 import { verifyToken, hashApiKey } from '../services/auth';
-import { PrismaClient } from '@prisma/client';
-
-// Initialize Prisma client
-const prisma = new PrismaClient();
+import { getDatabase } from '../services/database.js';
 
 /**
  * Authenticate JWT token
@@ -111,11 +108,19 @@ export async function authenticateAPIKey(c: Context, next: Next): Promise<Respon
     // Hash the provided API key
     const apiKeyHash = await hashApiKey(apiKey);
     
+    // Get database client
+    const db = getDatabase();
+    
     // Look up platform by API key hash
-    const platform = await prisma.platform.findFirst({
-      where: {
-        api_key_hash: apiKeyHash,
-        is_active: true,
+    const platform = await db.query.platforms.findFirst({
+      where: (platforms, { and, eq }) =>
+        and(
+          eq(platforms.apiKeyHash, apiKeyHash),
+          eq(platforms.status, 'active')
+        ),
+      columns: {
+        id: true,
+        name: true,
       },
     });
 

@@ -2,7 +2,9 @@
 // Provides platform performance metrics and analytics
 // Optimized for fast calculation with caching support
 
-import { PrismaClient } from '@prisma/client';
+import { getDb } from '../db/client.js';
+import * as schema from '../db/schema.js';
+import { eq, gte, and, sql } from 'drizzle-orm';
 
 /**
  * Platform analytics response interface
@@ -28,26 +30,25 @@ export interface PlatformAnalytics {
 
 /**
  * Calculate platform analytics
- * @param prisma - Prisma client instance
+ * @param db - Drizzle database instance
  * @param platformId - Platform ID
  * @param days - Number of days for time series data (default: 30)
  * @returns Platform analytics data
  */
 export async function calculatePlatformAnalytics(
-  prisma: PrismaClient,
+  db: ReturnType<typeof getDb>,
   platformId: string,
   days: number = 30
 ): Promise<PlatformAnalytics> {
   const startTime = Date.now();
 
   // Get platform details
-  const platform = await prisma.platform.findUnique({
-    where: { id: platformId },
-    select: {
+  const platform = await db.query.platforms.findFirst({
+    where: eq(schema.platforms.id, platformId),
+    columns: {
       id: true,
       name: true,
-      total_payouts: true,
-      total_tasks: true,
+      totalPaymentsUsdc: true,
     },
   });
 
@@ -60,42 +61,40 @@ export async function calculatePlatformAnalytics(
   startDate.setDate(startDate.getDate() - days);
 
   // Get all completed tasks for this platform
-  const completedTasks = await prisma.task.findMany({
-    where: {
-      platform_id: platformId,
-      status: 'completed',
-      completed_at: {
-        gte: startDate,
-      },
-    },
-    select: {
-      id: true,
-      worker_id: true,
-      amount: true,
-      created_at: true,
-      completed_at: true,
-    },
-    orderBy: {
-      completed_at: 'asc',
-    },
-  });
+  const completedTasks = await db
+    .select({
+      id: schema.tasks.id,
+      workerId: schema.tasks.workerId,
+      paymentAmountUsdc: schema.tasks.paymentAmountUsdc,
+      createdAt: schema.tasks.createdAt,
+      completedAt: schema.tasks.completedAt,
+    })
+    .from(schema.tasks)
+    .where(
+      and(
+        eq(schema.tasks.platformId, platformId),
+        eq(schema.tasks.status, 'completed'),
+        gte(schema.tasks.completedAt, startDate)
+      )
+    )
+    .orderBy(schema.tasks.completedAt);
 
   // Calculate metrics
   const totalPayouts = completedTasks.reduce(
-    (sum: number, task: any) => sum + Number(task.amount),
+    (sum: number, task: any) => sum + Number(task.paymentAmountUsdc),
     0
   );
 
   const tasksCompleted = completedTasks.length;
 
-  const uniqueWorkers = new Set(completedTasks.map((task: any) => task.worker_id)).size;
+  const uniqueWorkers = new Set(completedTasks.map((task: any) => task.workerId).filter(Boolean)).size;
 
   // Calculate average payment time (time from task creation to completion)
   const paymentTimes = completedTasks
-    .filter((task: any) => task.completed_at)
+    .filter((task: any) => task.completedAt && task.createdAt)
     .map((task: any) => {
-      const created = new Date(task.created_at).getTime();
-      const completed = new Date(task.completed_at!).getTime();
+      const created = new Date(task.createdAt).getTime();
+      const completed = new Date(task.completedAt!).getTime();
       return (completed - created) / 1000; // Convert to seconds
     });
 
@@ -105,7 +104,7 @@ export async function calculatePlatformAnalytics(
       : 0;
 
   // Get average rating for this platform's tasks
-  const ratingResult = await prisma.$queryRaw<{ avg_rating: number }[]>`
+  const ratingResult = await db.execute<{ avg_rating: number }>(sql`
     SELECT 
       COALESCE(AVG(w.average_rating), 0) as avg_rating
     FROM tasks t
@@ -113,9 +112,9 @@ export async function calculatePlatformAnalytics(
     WHERE t.platform_id = ${platformId}
       AND t.status = 'completed'
       AND t.completed_at >= ${startDate}
-  `;
+  `);
 
-  const averageRating = ratingResult[0]?.avg_rating || 0;
+  const averageRating = (Array.isArray(ratingResult) ? ratingResult[0] : ratingResult.rows[0])?.avg_rating || 0;
 
   // Generate time series data (daily aggregates)
   const timeSeriesMap = new Map<string, { payouts: number; tasks: Set<string>; workers: Set<string> }>();
@@ -134,13 +133,15 @@ export async function calculatePlatformAnalytics(
 
   // Populate with actual data
   completedTasks.forEach((task: any) => {
-    if (task.completed_at) {
-      const dateStr = new Date(task.completed_at).toISOString().split('T')[0];
+    if (task.completedAt) {
+      const dateStr = new Date(task.completedAt).toISOString().split('T')[0];
       const entry = timeSeriesMap.get(dateStr);
       if (entry) {
-        entry.payouts += Number(task.amount);
+        entry.payouts += Number(task.paymentAmountUsdc);
         entry.tasks.add(task.id);
-        entry.workers.add(task.worker_id);
+        if (task.workerId) {
+          entry.workers.add(task.workerId);
+        }
       }
     }
   });
@@ -186,13 +187,13 @@ const analyticsCache = new Map<string, CacheEntry>();
 
 /**
  * Get platform analytics with caching
- * @param prisma - Prisma client instance
+ * @param db - Drizzle database instance
  * @param platformId - Platform ID
  * @param cacheDuration - Cache duration in seconds (default: 300 = 5 minutes)
  * @returns Platform analytics data (cached or fresh)
  */
 export async function getPlatformAnalyticsWithCache(
-  prisma: PrismaClient,
+  db: ReturnType<typeof getDb>,
   platformId: string,
   cacheDuration: number = 300
 ): Promise<PlatformAnalytics> {
@@ -208,7 +209,7 @@ export async function getPlatformAnalyticsWithCache(
 
   // Calculate fresh analytics
   console.log(`Analytics cache miss for platform ${platformId}, calculating...`);
-  const analytics = await calculatePlatformAnalytics(prisma, platformId);
+  const analytics = await calculatePlatformAnalytics(db, platformId);
 
   // Store in cache
   analyticsCache.set(cacheKey, {

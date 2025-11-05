@@ -209,15 +209,17 @@ This design document serves as the bridge between requirements and implementatio
 **Risk Engine**
 
 - **Responsibilities:**
-  - Task verification (AI or heuristic)
-  - Worker risk scoring (0-1000)
-  - Earnings prediction (7-day forecast)
+  - Task verification (AI-powered with fraud detection)
+  - Worker risk scoring (0-1000) using Gradient Boosting
+  - Earnings prediction (7-day forecast) using Prophet
   - Advance eligibility calculation
+  - Fraud detection and anomaly pattern recognition
 - **Models:**
-  - Task verification: Binary classifier (approve/flag/reject)
-  - Risk scoring: Regression model or weighted heuristic
-  - Earnings prediction: Time series model or moving average
+  - Task verification: AI classifier with fraud detection (approve/flag/reject)
+  - Risk scoring: Gradient Boosting (XGBoost) with weekly retraining
+  - Earnings prediction: Time series forecasting (Prophet) with MAPE < 15%
 - **Performance:** <500ms for verification, <100ms for scoring
+- **Training:** Weekly model retraining on simulated historical data
 
 **Webhook Handler**
 
@@ -2557,19 +2559,33 @@ function verifyWithHeuristic(task: TaskCompletion): AIVerdict {
 
 ### 5.2 Risk Scoring Model
 
-**Purpose:** Calculate worker creditworthiness for advance eligibility.
+**Purpose:** Calculate worker creditworthiness for advance eligibility using Gradient Boosting (XGBoost).
 
-#### 5.2.1 Scoring Algorithm
+#### 5.2.1 ML Model Specifications
+
+**Algorithm:** Gradient Boosting (XGBoost)  
+**Training Data:** Simulated historical completion data  
+**Retraining Frequency:** Weekly  
+**Inference Latency:** < 100ms  
+**Score Range:** 0-1000
+
+**Input Features:**
 
 ```typescript
 interface RiskScoreInputs {
-  reputationScore: number; // 0-1000
+  // Primary features (from PRD 6.4)
+  completionRateLast30Days: number; // 0-1
+  averageTaskValue: number; // USD
   accountAgeDays: number;
+  disputeCount: number;
+  ratingVariance: number; // Variance in ratings received
+  timeOfDayPatterns: number[]; // 24-hour distribution
+
+  // Additional features
+  reputationScore: number; // 0-1000 from blockchain
   totalTasksCompleted: number;
-  completionRate: number; // 0-1
   onTimeRate: number; // 0-1
   averageRating: number; // 0-5
-  totalDisputes: number;
   activeLoans: number;
   loanRepaymentHistory: number; // 0-1 (% repaid on time)
   earningsVolatility: number; // Standard deviation of weekly earnings
@@ -2577,13 +2593,47 @@ interface RiskScoreInputs {
 }
 
 interface RiskScoreOutput {
-  score: number; // 0-1000
-  factors: Record<string, number>; // Factor contributions
-  eligibleForAdvance: boolean;
-  maxAdvanceAmount: number;
-  recommendedFeeRate: number; // Basis points
+  score: number; // 0-1000 (XGBoost prediction)
+  factors: Record<string, number>; // Feature importance
+  eligibleForAdvance: boolean; // score >= 600
+  maxAdvanceAmount: number; // 80% of predicted earnings
+  recommendedFeeRate: number; // 2-5% based on risk (200-500 basis points)
+  confidence: number; // Model confidence 0-1
 }
+```
 
+#### 5.2.2 XGBoost Model Configuration
+
+```typescript
+// Model hyperparameters (for reference)
+const xgboostConfig = {
+  objective: "reg:squarederror",
+  max_depth: 6,
+  learning_rate: 0.1,
+  n_estimators: 100,
+  subsample: 0.8,
+  colsample_bytree: 0.8,
+  min_child_weight: 1,
+  gamma: 0,
+};
+
+// Feature weights (approximate, learned from training)
+const featureWeights = {
+  completionRateLast30Days: 0.25,
+  averageTaskValue: 0.15,
+  accountAgeDays: 0.1,
+  disputeCount: -0.2, // Negative impact
+  ratingVariance: -0.1, // Negative impact (inconsistency)
+  reputationScore: 0.2,
+  earningsVolatility: -0.1, // Negative impact
+};
+```
+
+#### 5.2.3 Scoring Implementation (Heuristic Fallback)
+
+For MVP/demo without trained XGBoost model, use rule-based heuristic:
+
+```typescript
 function calculateRiskScore(inputs: RiskScoreInputs): RiskScoreOutput {
   const factors: Record<string, number> = {};
 
@@ -2600,7 +2650,7 @@ function calculateRiskScore(inputs: RiskScoreInputs): RiskScoreOutput {
 
   // 4. Performance metrics (20% weight)
   const performanceScore =
-    inputs.completionRate * 0.4 +
+    inputs.completionRateLast30Days * 0.4 +
     inputs.onTimeRate * 0.4 +
     (inputs.averageRating / 5) * 0.2;
   factors.performance = performanceScore * 200;
@@ -2747,28 +2797,84 @@ function explainScore(
 
 ### 5.3 Earnings Prediction Engine
 
-**Purpose:** Forecast next 7 days earnings to determine safe advance amounts.
+**Purpose:** Forecast next 7 days earnings to determine safe advance amounts using time series forecasting.
 
-#### 5.3.1 Prediction Algorithm
+#### 5.3.1 ML Model Specifications
+
+**Algorithm:** Time series forecasting (Prophet or ARIMA)  
+**Training Data:** Historical daily earnings (minimum 30 days)  
+**Prediction Horizon:** 7 days  
+**Accuracy Target:** MAPE (Mean Absolute Percentage Error) < 15%  
+**Inference Latency:** < 500ms  
+**Update Frequency:** Daily
+
+**Input Features:**
 
 ```typescript
 interface EarningsHistory {
   date: string; // ISO date
   earnings: number;
   tasksCompleted: number;
+  platform: string; // For platform-specific patterns
+  dayOfWeek: number; // 0-6
+  holiday: boolean;
 }
 
+interface ProphetFeatures {
+  historicalEarnings: EarningsHistory[]; // Min 30 days
+  dayOfWeekPatterns: Record<number, number>; // Average earnings per day
+  seasonality: "weekly" | "monthly" | "none";
+  trend: "increasing" | "stable" | "decreasing";
+  regressors: {
+    platformTrend: number;
+    competitionIndex: number;
+  };
+}
+```
+
+**Prophet Model Configuration:**
+
+```typescript
+// Prophet hyperparameters
+const prophetConfig = {
+  changepoint_prior_scale: 0.05, // Flexibility of trend
+  seasonality_prior_scale: 10, // Strength of seasonality
+  seasonality_mode: "multiplicative", // Or 'additive'
+  weekly_seasonality: true,
+  daily_seasonality: false,
+  yearly_seasonality: false,
+  interval_width: 0.8, // 80% confidence interval
+};
+```
+
+#### 5.3.2 Prediction Output
+
+```typescript
 interface EarningsPrediction {
-  next7Days: number;
-  confidence: "high" | "medium" | "low";
-  confidenceInterval: [number, number]; // [lower, upper]
-  breakdown: Array<{
+  next7Days: number; // Total predicted earnings
+  dailyPredictions: Array<{
     date: string;
     predicted: number;
-    reasoning: string;
+    lower: number; // Lower bound of confidence interval
+    upper: number; // Upper bound of confidence interval
   }>;
+  confidence: "high" | "medium" | "low";
+  confidenceScore: number; // 0-1
+  mape: number; // Model accuracy on recent data
+  breakdown: {
+    weekdayEarnings: number; // Mon-Fri
+    weekendEarnings: number; // Sat-Sun
+    trendAdjustment: number; // +/- adjustment based on trend
+  };
+  safeAdvanceAmount: number; // 50-80% of prediction
 }
+```
 
+#### 5.3.3 Prediction Implementation (Heuristic Fallback)
+
+For MVP/demo without trained Prophet model, use moving average:
+
+```typescript
 function predictEarnings(history: EarningsHistory[]): EarningsPrediction {
   if (history.length < 7) {
     // Insufficient data - use conservative estimate
@@ -2776,6 +2882,17 @@ function predictEarnings(history: EarningsHistory[]): EarningsPrediction {
       history.reduce((sum, h) => sum + h.earnings, 0) / history.length;
     return {
       next7Days: avgDaily * 7 * 0.7, // 70% of average for safety
+      confidence: "low",
+      confidenceScore: 0.5,
+      mape: 25, // Conservative estimate
+      breakdown: {
+        weekdayEarnings: avgDaily * 5 * 0.7,
+        weekendEarnings: avgDaily * 2 * 0.7,
+        trendAdjustment: 0,
+      },
+      safeAdvanceAmount: avgDaily * 7 * 0.5, // 50% for low confidence
+    };
+  }
       confidence: "low",
       confidenceInterval: [avgDaily * 5, avgDaily * 9],
       breakdown: [],

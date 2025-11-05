@@ -11,7 +11,10 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { executeInstantPayment } from '../services/payment';
-import { getPrisma } from '../services/database';
+import { getDatabase } from '../services/database.js';
+import * as schema from '../db/schema.js';
+import { eq, or, inArray, sql } from 'drizzle-orm';
+import { count } from 'drizzle-orm';
 
 const demoRoutes = new Hono();
 
@@ -45,32 +48,32 @@ demoRoutes.post(
   zValidator('json', completeTaskSchema),
   async (c) => {
     try {
-      const { workerId, taskType, amount, description, platformId } = c.req.valid('json');
-      const prisma = getPrisma();
+      const db = getDatabase();
+      const { workerId, platformId, amount, taskType, description } = await c.req.json();
 
       // Step 1: Get or create demo platform
-      let platform = await prisma.platform.findFirst({
-        where: { name: 'Demo Platform' },
+      let platform = await db.query.platforms.findFirst({
+        where: eq(schema.platforms.name, 'Demo Platform'),
       });
 
       if (!platform) {
-        platform = await prisma.platform.create({
-          data: {
+        const [newPlatform] = await db
+          .insert(schema.platforms)
+          .values({
             name: 'Demo Platform',
             email: 'demo@gigstream.app',
-            api_key_hash: 'demo_hash',
-            wallet_id: 'demo_wallet_id',
-            wallet_address: '0x0000000000000000000000000000000000000001',
+            apiKeyHash: 'demo_hash',
             status: 'active',
-          },
-        });
+          })
+          .returning();
+        platform = newPlatform;
       }
 
       const usePlatformId = platformId || platform.id;
 
       // Step 2: Verify worker exists
-      const worker = await prisma.worker.findUnique({
-        where: { id: workerId },
+      const worker = await db.query.workers.findFirst({
+        where: eq(schema.workers.id, workerId),
       });
 
       if (!worker) {
@@ -87,23 +90,24 @@ demoRoutes.post(
       }
 
       // Step 3: Create demo task
-      const task = await prisma.task.create({
-        data: {
-          platform_id: usePlatformId,
-          worker_id: workerId,
+      const [task] = await db
+        .insert(schema.tasks)
+        .values({
+          platformId: usePlatformId,
+          workerId: workerId,
           title: `Demo ${taskType === 'streaming' ? 'Streaming' : 'Fixed'} Task`,
           description: description || 'Demo task for payment flow demonstration',
-          amount: amount,
+          paymentAmountUsdc: amount.toString(),
           status: 'completed',
-          task_type: taskType,
-          completed_at: new Date(),
+          type: taskType,
+          completedAt: new Date(),
           metadata: {
             demo: true,
             taskType,
             completedBy: 'simulator',
           },
-        },
-      });
+        })
+        .returning();
 
       // Step 4: Execute instant payment
       const paymentResult = await executeInstantPayment({
@@ -114,30 +118,32 @@ demoRoutes.post(
       });
 
       // Step 5: Update reputation (simplified for demo)
-      await prisma.reputationEvent.create({
-        data: {
-          worker_id: workerId,
-          event_type: 'task_completed',
-          score_change: 5,
+      // Get current reputation score first
+      const currentScore = worker.reputationScore || 500;
+      const delta = 5;
+      const newScore = Math.min(1000, Math.max(0, currentScore + delta));
+
+      await db
+        .insert(schema.reputationEvents)
+        .values({
+          workerId: workerId,
+          eventType: 'task_completed',
+          pointsDelta: delta,
+          previousScore: currentScore,
+          newScore: newScore,
+          description: 'Demo task completed',
           metadata: {
             task_id: task.id,
             amount: amount,
             demo: true,
           },
-        },
-      });
+        });
 
       // Update worker's reputation score
-      const reputationEvents = await prisma.reputationEvent.findMany({
-        where: { worker_id: workerId },
-      });
-      const totalScore = reputationEvents.reduce((sum, event) => sum + event.score_change, 0);
-      const newScore = Math.min(1000, Math.max(0, 500 + totalScore));
-
-      await prisma.worker.update({
-        where: { id: workerId },
-        data: { reputation_score: newScore },
-      });
+      await db
+        .update(schema.workers)
+        .set({ reputationScore: newScore })
+        .where(eq(schema.workers.id, workerId));
 
       // Step 6: Return success response with all details
       return c.json(
@@ -148,10 +154,10 @@ demoRoutes.post(
               id: task.id,
               title: task.title,
               description: task.description,
-              amount: task.amount,
-              type: task.task_type,
+              amount: parseFloat(task.paymentAmountUsdc),
+              type: task.type,
               status: task.status,
-              completedAt: task.completed_at,
+              completedAt: task.completedAt,
             },
             payment: {
               id: paymentResult.id,
@@ -165,9 +171,9 @@ demoRoutes.post(
             },
             worker: {
               id: worker.id,
-              name: worker.name,
+              name: worker.displayName,
               reputationScore: newScore,
-              walletAddress: worker.wallet_address,
+              walletAddress: worker.walletAddress,
             },
             blockchain: {
               network: 'Arc Testnet',
@@ -242,96 +248,108 @@ demoRoutes.post(
  */
 demoRoutes.post('/reset', async (c) => {
   try {
-    const prisma = getPrisma();
+    const db = getDatabase();
 
     // Step 1: Find all demo tasks
-    const demoTasks = await prisma.task.findMany({
-      where: {
-        OR: [
-          { metadata: { path: ['demo'], equals: true } },
-          { title: { contains: 'Demo' } },
-        ],
-      },
+    const demoTasks = await db.query.tasks.findMany({
+      where: (tasks, { or, like, sql }) =>
+        or(
+          sql`${tasks.metadata}->>'demo' = 'true'`,
+          like(tasks.title, '%Demo%')
+        ),
+      columns: { id: true },
     });
 
     const demoTaskIds = demoTasks.map((task) => task.id);
 
-    // Step 2: Delete demo transactions
-    const deletedTransactions = await prisma.transaction.deleteMany({
-      where: { task_id: { in: demoTaskIds } },
-    });
+    let deletedTransactionsCount = 0;
+    let deletedReputationEventsCount = 0;
+    let deletedTasksCount = 0;
 
-    // Step 3: Delete demo reputation events
-    const deletedReputationEvents = await prisma.reputationEvent.deleteMany({
-      where: {
-        OR: [
-          { metadata: { path: ['demo'], equals: true } },
-          { metadata: { path: ['task_id'], in: demoTaskIds } },
-        ],
-      },
-    });
+    if (demoTaskIds.length > 0) {
+      // Step 2: Delete demo transactions
+      const deletedTransactions = await db
+        .delete(schema.transactions)
+        .where(inArray(schema.transactions.taskId, demoTaskIds))
+        .returning();
+      deletedTransactionsCount = deletedTransactions.length;
 
-    // Step 4: Delete demo tasks
-    const deletedTasks = await prisma.task.deleteMany({
-      where: { id: { in: demoTaskIds } },
-    });
+      // Step 3: Delete demo reputation events
+      const deletedReputationEvents = await db
+        .delete(schema.reputationEvents)
+        .where(
+          or(
+            sql`${schema.reputationEvents.metadata}->>'demo' = 'true'`,
+            inArray(
+              sql`(${schema.reputationEvents.metadata}->>'task_id')::uuid`,
+              demoTaskIds
+            )
+          )
+        )
+        .returning();
+      deletedReputationEventsCount = deletedReputationEvents.length;
+
+      // Step 4: Delete demo tasks
+      const deletedTasks = await db
+        .delete(schema.tasks)
+        .where(inArray(schema.tasks.id, demoTaskIds))
+        .returning();
+      deletedTasksCount = deletedTasks.length;
+    }
 
     // Step 5: Reset demo workers to baseline reputation
-    const demoWorkers = await prisma.worker.findMany({
-      where: {
-        OR: [
-          { name: { contains: 'Demo' } },
-          { email: { contains: 'demo' } },
-        ],
-      },
+    const demoWorkers = await db.query.workers.findMany({
+      where: (workers, { or, like }) =>
+        or(like(workers.displayName, '%Demo%'), like(workers.email, '%demo%')),
+      columns: { id: true, displayName: true, email: true },
     });
 
     // Reset reputation scores for demo workers
     for (const worker of demoWorkers) {
       // Calculate baseline score from non-demo events
-      const nonDemoEvents = await prisma.reputationEvent.findMany({
-        where: {
-          worker_id: worker.id,
-          NOT: {
-            metadata: { path: ['demo'], equals: true },
-          },
-        },
+      const nonDemoEvents = await db.query.reputationEvents.findMany({
+        where: (events, { and, eq, sql }) =>
+          and(
+            eq(events.workerId, worker.id),
+            sql`${events.metadata}->>'demo' IS DISTINCT FROM 'true'`
+          ),
+        columns: { pointsDelta: true },
       });
 
       const baselineScore = nonDemoEvents.reduce(
-        (sum, event) => sum + event.score_change,
+        (sum, event) => sum + event.pointsDelta,
         500
       );
 
-      await prisma.worker.update({
-        where: { id: worker.id },
-        data: { reputation_score: Math.min(1000, Math.max(0, baselineScore)) },
-      });
+      await db
+        .update(schema.workers)
+        .set({ reputationScore: Math.min(1000, Math.max(0, baselineScore)) })
+        .where(eq(schema.workers.id, worker.id));
     }
 
     // Step 6: Log the reset action
-    await prisma.auditLog.create({
-      data: {
-        entity_type: 'demo',
-        entity_id: 'demo_reset',
-        action: 'reset',
-        user_id: 'system',
-        metadata: {
-          deletedTransactions: deletedTransactions.count,
-          deletedTasks: deletedTasks.count,
-          deletedReputationEvents: deletedReputationEvents.count,
-          resetWorkers: demoWorkers.length,
-          timestamp: new Date().toISOString(),
-        },
+    await db.insert(schema.auditLogs).values({
+      actorType: 'system',
+      actorId: null,
+      action: 'reset',
+      resourceType: 'demo',
+      resourceId: null,
+      success: true,
+      metadata: {
+        deletedTransactions: deletedTransactionsCount,
+        deletedTasks: deletedTasksCount,
+        deletedReputationEvents: deletedReputationEventsCount,
+        resetWorkers: demoWorkers.length,
+        timestamp: new Date().toISOString(),
       },
     });
 
     return c.json({
       success: true,
       data: {
-        deletedTransactions: deletedTransactions.count,
-        deletedTasks: deletedTasks.count,
-        deletedReputationEvents: deletedReputationEvents.count,
+        deletedTransactions: deletedTransactionsCount,
+        deletedTasks: deletedTasksCount,
+        deletedReputationEvents: deletedReputationEventsCount,
         resetWorkers: demoWorkers.length,
         message: 'Demo data reset successfully',
       },
@@ -361,36 +379,36 @@ demoRoutes.post('/reset', async (c) => {
  */
 demoRoutes.get('/status', async (c) => {
   try {
-    const prisma = getPrisma();
+    const db = getDatabase();
 
     // Count demo data
-    const demoTasks = await prisma.task.count({
-      where: {
-        OR: [
-          { metadata: { path: ['demo'], equals: true } },
-          { title: { contains: 'Demo' } },
-        ],
-      },
-    });
+    const demoTasksResult = await db
+      .select({ count: count() })
+      .from(schema.tasks)
+      .where(
+        or(
+          sql`${schema.tasks.metadata}->>'demo' = 'true'`,
+          sql`${schema.tasks.title} LIKE '%Demo%'`
+        )
+      );
 
-    const demoTransactions = await prisma.transaction.count({
-      where: {
-        metadata: { path: ['demo'], equals: true },
-      },
-    });
+    const demoTasksCount = demoTasksResult[0]?.count ?? 0;
 
-    const demoWorkers = await prisma.worker.findMany({
-      where: {
-        OR: [
-          { name: { contains: 'Demo' } },
-          { email: { contains: 'demo' } },
-        ],
-      },
-      select: {
+    const demoTransactionsResult = await db
+      .select({ count: count() })
+      .from(schema.transactions)
+      .where(sql`${schema.transactions.metadata}->>'demo' = 'true'`);
+
+    const demoTransactionsCount = demoTransactionsResult[0]?.count ?? 0;
+
+    const demoWorkers = await db.query.workers.findMany({
+      where: (workers, { or, like }) =>
+        or(like(workers.displayName, '%Demo%'), like(workers.email, '%demo%')),
+      columns: {
         id: true,
-        name: true,
-        reputation_score: true,
-        wallet_address: true,
+        displayName: true,
+        reputationScore: true,
+        walletAddress: true,
       },
     });
 
@@ -400,11 +418,16 @@ demoRoutes.get('/status', async (c) => {
         environment: 'demo',
         status: 'active',
         stats: {
-          demoTasks,
-          demoTransactions,
+          demoTasks: demoTasksCount,
+          demoTransactions: demoTransactionsCount,
           demoWorkers: demoWorkers.length,
         },
-        workers: demoWorkers,
+        workers: demoWorkers.map((worker) => ({
+          id: worker.id,
+          name: worker.displayName,
+          reputation_score: worker.reputationScore,
+          wallet_address: worker.walletAddress,
+        })),
         blockchain: {
           network: 'Arc Testnet',
           chainId: 5042002,
@@ -421,6 +444,131 @@ demoRoutes.get('/status', async (c) => {
         error: {
           code: 'DEMO_STATUS_FAILED',
           message: error instanceof Error ? error.message : 'Failed to get demo status',
+        },
+      },
+      500
+    );
+  }
+});
+
+/**
+ * GET /api/v1/demo/workers
+ * Get list of demo workers with their stats
+ */
+demoRoutes.get('/workers', async (c) => {
+  try {
+    const databaseUrl = c.env?.DATABASE_URL || process.env.DATABASE_URL;
+    const db = getDatabase(databaseUrl);
+    
+    const workers = await db.select().from(schema.workers).limit(20);
+    
+    return c.json({
+      success: true,
+      data: {
+        workers: workers.map((w) => ({
+          id: w.id,
+          name: w.displayName,
+          email: w.email,
+          walletAddress: w.walletAddress,
+          reputationScore: w.reputationScore,
+          totalTasksCompleted: w.totalTasksCompleted,
+          totalEarningsUsdc: w.totalEarningsUsdc,
+          status: w.status,
+          createdAt: w.createdAt,
+        })),
+        total: workers.length,
+      },
+    });
+  } catch (error) {
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: 'DEMO_WORKERS_FAILED',
+          message: error instanceof Error ? error.message : 'Failed to get workers',
+        },
+      },
+      500
+    );
+  }
+});
+
+/**
+ * GET /api/v1/demo/platforms
+ * Get list of demo platforms
+ */
+demoRoutes.get('/platforms', async (c) => {
+  try {
+    const databaseUrl = c.env?.DATABASE_URL || process.env.DATABASE_URL;
+    const db = getDatabase(databaseUrl);
+    
+    const platforms = await db.select().from(schema.platforms).limit(20);
+    
+    return c.json({
+      success: true,
+      data: {
+        platforms: platforms.map((p) => ({
+          id: p.id,
+          name: p.name,
+          email: p.email,
+          totalWorkers: p.totalWorkers,
+          totalPaymentsUsdc: p.totalPaymentsUsdc,
+          status: p.status,
+          createdAt: p.createdAt,
+        })),
+        total: platforms.length,
+      },
+    });
+  } catch (error) {
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: 'DEMO_PLATFORMS_FAILED',
+          message: error instanceof Error ? error.message : 'Failed to get platforms',
+        },
+      },
+      500
+    );
+  }
+});
+
+/**
+ * GET /api/v1/demo/tasks
+ * Get list of demo tasks
+ */
+demoRoutes.get('/tasks', async (c) => {
+  try {
+    const databaseUrl = c.env?.DATABASE_URL || process.env.DATABASE_URL;
+    const db = getDatabase(databaseUrl);
+    
+    const tasks = await db.select().from(schema.tasks).limit(20);
+    
+    return c.json({
+      success: true,
+      data: {
+        tasks: tasks.map((t) => ({
+          id: t.id,
+          workerId: t.workerId,
+          platformId: t.platformId,
+          title: t.title,
+          type: t.type,
+          paymentAmountUsdc: t.paymentAmountUsdc,
+          paidAmountUsdc: t.paidAmountUsdc,
+          status: t.status,
+          createdAt: t.createdAt,
+          completedAt: t.completedAt,
+        })),
+        total: tasks.length,
+      },
+    });
+  } catch (error) {
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: 'DEMO_TASKS_FAILED',
+          message: error instanceof Error ? error.message : 'Failed to get tasks',
         },
       },
       500

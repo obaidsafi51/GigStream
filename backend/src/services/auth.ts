@@ -5,7 +5,7 @@
 
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import { JWTPayload } from '../types/api';
+import { JWTPayload } from '../types/api.js';
 
 const BCRYPT_ROUNDS = 10;
 const JWT_SECRET = process.env.JWT_SECRET || 'default-secret-change-in-production';

@@ -6,7 +6,9 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { validateRequest } from '../middleware/validation';
-import { PrismaClient } from '@prisma/client';
+import { getDatabase } from '../services/database.js';
+import * as schema from '../db/schema.js';
+import { eq } from 'drizzle-orm';
 import {
   hashPassword,
   verifyPassword,
@@ -20,7 +22,6 @@ import {
 import { createWallet } from '../services/circle';
 
 const authRoutes = new Hono();
-const prisma = new PrismaClient();
 
 // Validation schemas
 const registerSchema = z.object({
@@ -68,10 +69,12 @@ authRoutes.post('/register', validateRequest(registerSchema), async (c) => {
       );
     }
 
+    const db = getDatabase();
+
     if (type === 'worker') {
       // Check if email already exists
-      const existingWorker = await prisma.worker.findUnique({
-        where: { email },
+      const existingWorker = await db.query.workers.findFirst({
+        where: eq(schema.workers.email, email),
       });
 
       if (existingWorker) {
@@ -125,45 +128,42 @@ authRoutes.post('/register', validateRequest(registerSchema), async (c) => {
       }
 
       // Create worker with wallet information
-      const worker = await prisma.worker.create({
-        data: {
+      const [worker] = await db
+        .insert(schema.workers)
+        .values({
           email,
-          password_hash: passwordHash,
-          name,
-          wallet_id: walletId,
-          wallet_address: walletAddress,
-          reputation_score: 500, // Base score
-          account_age_days: 0,
-          completion_rate: 0,
-          total_tasks: 0,
-          total_earned: 0,
-          average_rating: 0,
-          dispute_rate: 0,
-        },
-      });
+          passwordHash,
+          displayName: name,
+          walletAddress: walletAddress || '0x0000000000000000000000000000000000000000', // Temp placeholder
+          walletId,
+          reputationScore: 500, // Base score
+          totalTasksCompleted: 0,
+          totalEarningsUsdc: '0',
+          status: 'active',
+        })
+        .returning();
 
       // Generate tokens
       const accessToken = generateAccessToken({
         sub: worker.id,
         type: 'worker',
-        wallet: worker.wallet_address || undefined,
+        wallet: worker.walletAddress || undefined,
       });
 
       const refreshToken = generateRefreshToken({
         sub: worker.id,
         type: 'worker',
-        wallet: worker.wallet_address || undefined,
+        wallet: worker.walletAddress || undefined,
       });
 
       // Log audit trail
-      await prisma.auditLog.create({
-        data: {
-          actor_id: worker.id,
-          actor_type: 'worker',
-          action: 'worker_registered',
-          resource_type: 'worker',
-          resource_id: worker.id,
-        },
+      await db.insert(schema.auditLogs).values({
+        actorId: worker.id,
+        actorType: 'worker',
+        action: 'worker_registered',
+        resourceType: 'worker',
+        resourceId: worker.id,
+        success: true,
       });
 
       return c.json(
@@ -173,10 +173,10 @@ authRoutes.post('/register', validateRequest(registerSchema), async (c) => {
             user: {
               id: worker.id,
               email: worker.email,
-              name: worker.name,
+              name: worker.displayName,
               type: 'worker',
-              walletAddress: worker.wallet_address,
-              reputationScore: worker.reputation_score,
+              walletAddress: worker.walletAddress,
+              reputationScore: worker.reputationScore,
             },
             accessToken,
             refreshToken,
@@ -186,8 +186,8 @@ authRoutes.post('/register', validateRequest(registerSchema), async (c) => {
       );
     } else {
       // Platform registration
-      const existingPlatform = await prisma.platform.findFirst({
-        where: { contact_email: email },
+      const existingPlatform = await db.query.platforms.findFirst({
+        where: eq(schema.platforms.email, email),
       });
 
       if (existingPlatform) {
@@ -208,28 +208,26 @@ authRoutes.post('/register', validateRequest(registerSchema), async (c) => {
       const apiKeyHash = await hashApiKey(apiKey);
 
       // Create platform
-      const platform = await prisma.platform.create({
-        data: {
+      const [platform] = await db
+        .insert(schema.platforms)
+        .values({
           name,
-          api_key: apiKey, // Store plaintext for now (will only show once)
-          api_key_hash: apiKeyHash,
-          contact_email: email,
-          total_payouts: 0,
-          total_tasks: 0,
-          active_workers: 0,
-          is_active: true,
-        },
-      });
+          email,
+          apiKeyHash,
+          totalWorkers: 0,
+          totalPaymentsUsdc: '0',
+          status: 'active',
+        })
+        .returning();
 
       // Log audit trail
-      await prisma.auditLog.create({
-        data: {
-          actor_id: platform.id,
-          actor_type: 'platform',
-          action: 'platform_registered',
-          resource_type: 'platform',
-          resource_id: platform.id,
-        },
+      await db.insert(schema.auditLogs).values({
+        actorId: platform.id,
+        actorType: 'platform',
+        action: 'platform_registered',
+        resourceType: 'platform',
+        resourceId: platform.id,
+        success: true,
       });
 
       return c.json(
@@ -239,7 +237,7 @@ authRoutes.post('/register', validateRequest(registerSchema), async (c) => {
             platform: {
               id: platform.id,
               name: platform.name,
-              email: platform.contact_email,
+              email: platform.email,
               type: 'platform',
             },
             apiKey, // Show API key only once!
@@ -273,9 +271,11 @@ authRoutes.post('/login', validateRequest(loginSchema), async (c) => {
   try {
     const { email, password } = await c.req.json();
 
+    const db = getDatabase();
+
     // Look up worker by email
-    const worker = await prisma.worker.findUnique({
-      where: { email },
+    const worker = await db.query.workers.findFirst({
+      where: eq(schema.workers.email, email),
     });
 
     if (!worker) {
@@ -292,7 +292,7 @@ authRoutes.post('/login', validateRequest(loginSchema), async (c) => {
     }
 
     // Verify password
-    const isValidPassword = await verifyPassword(password, worker.password_hash);
+    const isValidPassword = await verifyPassword(password, worker.passwordHash || '');
 
     if (!isValidPassword) {
       return c.json(
@@ -308,33 +308,32 @@ authRoutes.post('/login', validateRequest(loginSchema), async (c) => {
     }
 
     // Update last active timestamp
-    await prisma.worker.update({
-      where: { id: worker.id },
-      data: { last_active_at: new Date() },
-    });
+    await db
+      .update(schema.workers)
+      .set({ lastLoginAt: new Date() })
+      .where(eq(schema.workers.id, worker.id));
 
     // Generate tokens
     const accessToken = generateAccessToken({
       sub: worker.id,
       type: 'worker',
-      wallet: worker.wallet_address || undefined,
+      wallet: worker.walletAddress || undefined,
     });
 
     const refreshToken = generateRefreshToken({
       sub: worker.id,
       type: 'worker',
-      wallet: worker.wallet_address || undefined,
+      wallet: worker.walletAddress || undefined,
     });
 
     // Log audit trail
-    await prisma.auditLog.create({
-      data: {
-        actor_id: worker.id,
-        actor_type: 'worker',
-        action: 'worker_login',
-        resource_type: 'worker',
-        resource_id: worker.id,
-      },
+    await db.insert(schema.auditLogs).values({
+      actorId: worker.id,
+      actorType: 'worker',
+      action: 'worker_login',
+      resourceType: 'worker',
+      resourceId: worker.id,
+      success: true,
     });
 
     return c.json({
@@ -343,10 +342,10 @@ authRoutes.post('/login', validateRequest(loginSchema), async (c) => {
         user: {
           id: worker.id,
           email: worker.email,
-          name: worker.name,
+          name: worker.displayName,
           type: 'worker',
-          walletAddress: worker.wallet_address,
-          reputationScore: worker.reputation_score,
+          walletAddress: worker.walletAddress,
+          reputationScore: worker.reputationScore,
         },
         accessToken,
         refreshToken,
@@ -407,10 +406,12 @@ authRoutes.post('/refresh', validateRequest(refreshSchema), async (c) => {
       );
     }
 
+    const db = getDatabase();
+
     // Check if user/platform still exists
     if (payload.type === 'worker') {
-      const worker = await prisma.worker.findUnique({
-        where: { id: payload.sub },
+      const worker = await db.query.workers.findFirst({
+        where: eq(schema.workers.id, payload.sub),
       });
 
       if (!worker) {
@@ -430,7 +431,7 @@ authRoutes.post('/refresh', validateRequest(refreshSchema), async (c) => {
       const accessToken = generateAccessToken({
         sub: worker.id,
         type: 'worker',
-        wallet: worker.wallet_address || undefined,
+        wallet: worker.walletAddress || undefined,
       });
 
       return c.json({

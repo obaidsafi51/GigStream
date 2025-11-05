@@ -6,31 +6,33 @@
   "scripts": {
     "dev": "wrangler dev src/index.ts",
     "deploy": "wrangler deploy",
-    "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev",
-    "db:migrate:deploy": "prisma migrate deploy",
-    "db:push": "prisma db push",
-    "db:seed": "tsx prisma/seed.ts",
-    "db:studio": "prisma studio",
-    "db:reset": "prisma migrate reset"
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "db:drop": "drizzle-kit drop",
+    "db:seed": "npx tsx seed-database.mjs",
+    "test:db": "npx tsx test-drizzle-db.mjs",
+    "test:auth": "npx tsx test-auth-simple.mjs"
   },
   "dependencies": {
     "@circle-fin/developer-controlled-wallets": "^9.2.0",
+    "@hono/zod-validator": "^0.7.4",
     "@neondatabase/serverless": "^0.9.5",
-    "@prisma/adapter-neon": "^5.20.0",
-    "@prisma/client": "^6.18.0",
     "@types/bcryptjs": "^2.4.6",
     "bcryptjs": "^3.0.2",
+    "drizzle-orm": "^0.44.7",
     "ethers": "^6.15.0",
     "hono": "^4.6.3",
     "jsonwebtoken": "^9.0.2",
+    "postgres": "^3.4.7",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20241127.0",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22.9.1",
-    "prisma": "^6.18.0",
+    "drizzle-kit": "^0.31.6",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3",
     "wrangler": "^4.45.3"

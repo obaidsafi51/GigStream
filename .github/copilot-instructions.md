@@ -12,7 +12,7 @@ GigStream is an AI-powered real-time USDC payment streaming platform for gig wor
 
 ```
 contracts/    # Foundry + Solidity 0.8.20 (PaymentStreaming, ReputationLedger, MicroLoan)
-backend/      # Hono + Cloudflare Workers + PostgreSQL 16 + Prisma ORM
+backend/      # Hono + Cloudflare Workers + PostgreSQL 16 + Drizzle ORM
 frontend/     # Next.js 15 + React 19 + TypeScript 5 + Tailwind CSS 4
 scripts/      # Circle API utilities (.mjs files for wallet/testnet setup)
 project/      # Source-of-truth design documents
@@ -22,7 +22,7 @@ project/      # Source-of-truth design documents
 
 - **Blockchain**: Arc Testnet (Chain ID: 5042002), OpenZeppelin v5.4.0
 - **Circle SDK**: `@circle-fin/developer-controlled-wallets` (server-side only, NOT in frontend)
-- **Database**: Neon.tech serverless PostgreSQL with Prisma adapter
+- **Database**: PostgreSQL 16+ (local dev) OR Neon.tech (serverless edge), Drizzle ORM
 - **Frontend State**: Zustand (NOT Redux), React 19 Server Components
 - **Testing**: Foundry for contracts (28 tests, 100% pass), Jest for backend/frontend
 
@@ -48,14 +48,10 @@ npm run deploy:testnet         # Uses custom .mjs script, not Forge script
 
 ```bash
 cd backend
-npm run db:generate            # Generate Prisma client (always after schema changes)
-npm run db:migrate             # Apply migrations (8 tables + triggers + views)
-npm run db:seed                # Populate demo data (alice@example.com / demo123)
-npm run db:studio              # Open Prisma Studio browser GUI
-
-# CRITICAL: After migrations, manually apply triggers/views:
-psql $DATABASE_URL < prisma/triggers.sql
-psql $DATABASE_URL < prisma/views.sql
+npm run db:push                # Apply Drizzle schema to database (local or Neon)
+npm run db:studio              # Open Drizzle Studio browser GUI
+npm run test:db                # Test database CRUD operations
+npm run test:auth              # Test authentication service
 ```
 
 ### Frontend Development
