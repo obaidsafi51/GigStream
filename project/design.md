@@ -1,12 +1,13 @@
 # GigStream — Detailed Design Document
 
-**Version:** 1.0  
-**Date:** October 28, 2025  
-**Based on:** `requirements.md` v1.0  
-**Status:** ✅ **APPROVED** — Ready for Implementation
+**Version:** 1.1 (Updated)  
+**Date:** October 28, 2025 (Last Updated: November 5, 2025)  
+**Based on:** `requirements.md` v1.1  
+**Status:** ✅ **APPROVED** — Implementation In Progress
 
 **Approved by:** Team  
-**Approval Date:** October 28, 2025
+**Approval Date:** October 28, 2025  
+**Last Review:** November 5, 2025
 
 This document provides comprehensive low-level design specifications for the GigStream MVP, including detailed architecture, component interactions, data models, API contracts, state machines, security considerations, and implementation guidelines.
 
@@ -75,7 +76,7 @@ This design document serves as the bridge between requirements and implementatio
 ┌──────────▼─────▼─────────────────────────────────────────────────┐
 │                    DATA PERSISTENCE LAYER                         │
 ├───────────────────────────────────────────────────────────────────┤
-│  PostgreSQL 15+ (Primary Database)                               │
+│  PostgreSQL 16+ (Neon Serverless - Primary Database)                │
 │  - Workers, Platforms, Tasks, Streams, Loans, Reputation         │
 │  - Transactions, Audit Logs                                       │
 │                                                                   │
@@ -326,7 +327,7 @@ Total: <2 seconds (within 3s requirement)
 
 ### 2.1 Schema Overview
 
-The database uses PostgreSQL 15+ with the following design principles:
+The database uses PostgreSQL 16+ (Neon serverless) with the following design principles:
 
 - UUID primary keys for distributed system compatibility
 - JSONB for flexible metadata storage
@@ -334,6 +335,12 @@ The database uses PostgreSQL 15+ with the following design principles:
 - Indexes on frequently queried columns
 - Audit trail via append-only logs
 - Timestamp tracking (created_at, updated_at)
+
+**ORM & Edge Compatibility:**
+- **Current**: Prisma with `@prisma/adapter-neon` (MVP implementation)
+- **Limitation**: Prisma not optimized for Cloudflare Workers edge runtime
+- **Workaround**: Using Neon's HTTP adapter for edge compatibility
+- **Future**: Consider Drizzle ORM migration for production (optimized for edge)
 
 ### 2.2 Detailed Table Specifications
 
@@ -905,7 +912,7 @@ GROUP BY p.id, p.name;
 
 For the hackathon MVP:
 
-1. Use a migration tool like Prisma Migrate or Drizzle Kit
+1. Use Prisma Migrate for database migrations
 2. Seed script for demo data:
    - 10 demo workers with varying reputation scores
    - 2 demo platforms
