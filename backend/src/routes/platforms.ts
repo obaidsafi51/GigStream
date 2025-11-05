@@ -7,7 +7,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { authenticateAPIKey } from '../middleware/auth';
 import { validateRequest } from '../middleware/validation';
-import { getPrisma } from '../services/database.js';
+import { getDatabase } from '../services/database.js';
 import { getPlatformAnalyticsWithCache } from '../services/analytics.js';
 
 const platformsRoutes = new Hono();
@@ -165,12 +165,12 @@ platformsRoutes.get('/:platformId/analytics', authenticateAPIKey, async (c) => {
       }, 400);
     }
 
-    // Get Prisma client
-    const prisma = getPrisma();
+    // Get database client
+    const db = getDatabase();
 
     // Get analytics with caching (5 minutes = 300 seconds)
     const startTime = Date.now();
-    const analytics = await getPlatformAnalyticsWithCache(prisma, platformId, 300);
+    const analytics = await getPlatformAnalyticsWithCache(db, platformId, 300);
     const responseTime = Date.now() - startTime;
 
     // Return analytics data

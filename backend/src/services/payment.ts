@@ -18,10 +18,12 @@
  * 6. Emit payment event for listeners
  */
 
-import { PrismaClient } from '@prisma/client';
-import { getPrisma } from './database.js';
+import { getDatabase } from './database.js';
+import { getDb } from '../db/client.js';
 import { executeTransfer, getTransactionStatus } from './circle.js';
 import * as crypto from 'crypto';
+import { eq, and, desc } from 'drizzle-orm';
+import * as schema from '../db/schema.js';
 
 /**
  * Transaction result type
@@ -99,17 +101,16 @@ function calculatePaymentFee(amount: number): number {
  * Verify task eligibility for payment
  */
 async function verifyTaskEligibility(
-  prisma: PrismaClient,
+  db: ReturnType<typeof getDb>,
   taskId: string,
   workerId: string
 ): Promise<{ valid: boolean; error?: string; task?: any }> {
-  // 1. Check task exists
-  const task = await prisma.task.findUnique({
-    where: { id: taskId },
-    include: {
+  // 1. Check task exists with relations
+  const task = await db.query.tasks.findFirst({
+    where: eq(schema.tasks.id, taskId),
+    with: {
       worker: true,
       platform: true,
-      transactions: true,
     },
   });
 
@@ -118,7 +119,7 @@ async function verifyTaskEligibility(
   }
 
   // 2. Verify worker ownership
-  if (task.worker_id !== workerId) {
+  if (task.workerId !== workerId) {
     return { valid: false, error: 'Task does not belong to this worker' };
   }
 
@@ -127,17 +128,25 @@ async function verifyTaskEligibility(
     return { valid: false, error: 'Task is not completed' };
   }
 
-  // 4. Check not already paid
-  const existingPayment = task.transactions.find(
-    (tx: any) => tx.tx_type === 'payout' && tx.status === 'completed'
-  );
+  // 4. Check not already paid - query transactions
+  const existingPayments = await db
+    .select()
+    .from(schema.transactions)
+    .where(
+      and(
+        eq(schema.transactions.taskId, taskId),
+        eq(schema.transactions.type, 'payout'),
+        eq(schema.transactions.status, 'confirmed')
+      )
+    )
+    .limit(1);
 
-  if (existingPayment) {
+  if (existingPayments.length > 0) {
     return { valid: false, error: 'Task already paid' };
   }
 
   // 5. Validate amount
-  const amount = parseFloat(task.amount.toString());
+  const amount = parseFloat(task.paymentAmountUsdc);
   if (amount <= 0 || amount > 10000) {
     return { valid: false, error: 'Invalid payment amount' };
   }
@@ -214,7 +223,7 @@ function sleep(ms: number): Promise<void> {
  * Update database with payment result
  */
 async function updateDatabaseRecords(
-  prisma: PrismaClient,
+  db: ReturnType<typeof getDb>,
   taskId: string,
   workerId: string,
   platformId: string,
@@ -222,72 +231,86 @@ async function updateDatabaseRecords(
   fee: number,
   txHash: string | null,
   circleTxId: string | null,
-  status: 'completed' | 'failed',
+  status: 'confirmed' | 'failed',
   error?: string
 ): Promise<any> {
-  return prisma.$transaction(async (tx) => {
+  return db.transaction(async (tx) => {
     // 1. Create transaction record
-    const transaction = await tx.transaction.create({
-      data: {
-        worker_id: workerId,
-        task_id: taskId,
-        tx_hash: txHash,
-        tx_type: 'payout',
-        amount: amount,
-        fee: fee,
+    const [transaction] = await tx
+      .insert(schema.transactions)
+      .values({
+        workerId,
+        platformId,
+        taskId,
+        txHash: txHash || undefined,
+        type: 'payout',
+        amountUsdc: amount.toString(),
+        feeUsdc: fee.toString(),
         status: status,
-        circle_tx_id: circleTxId,
-        error_message: error,
-        processed_at: status === 'completed' ? new Date() : null,
+        errorMessage: error || undefined,
+        confirmedAt: status === 'confirmed' ? new Date() : undefined,
         metadata: {
           platform_id: platformId,
           net_amount: amount - fee,
+          circle_tx_id: circleTxId,
         },
-      },
-    });
+      })
+      .returning();
 
     // 2. Update task status if not already set
-    await tx.task.update({
-      where: { id: taskId },
-      data: {
-        status: status === 'completed' ? 'completed' : 'active',
-        completed_at: status === 'completed' ? new Date() : undefined,
-      },
-    });
+    await tx
+      .update(schema.tasks)
+      .set({
+        status: status === 'confirmed' ? 'completed' : 'in_progress',
+        completedAt: status === 'confirmed' ? new Date() : undefined,
+      })
+      .where(eq(schema.tasks.id, taskId));
 
     // 3. Create audit log
-    await tx.auditLog.create({
-      data: {
-        actor_id: 'system',
-        actor_type: 'system',
-        action: 'execute_payment',
-        resource_type: 'transaction',
-        resource_id: transaction.id,
-        metadata: {
-          task_id: taskId,
-          worker_id: workerId,
-          amount: amount.toString(),
-          status,
-          tx_hash: txHash,
-        },
+    await tx.insert(schema.auditLogs).values({
+      actorId: 'system',
+      actorType: 'system',
+      action: 'execute_payment',
+      resourceType: 'transaction',
+      resourceId: transaction.id,
+      success: status === 'confirmed',
+      errorMessage: error || undefined,
+      metadata: {
+        task_id: taskId,
+        worker_id: workerId,
+        amount: amount.toString(),
+        status,
+        tx_hash: txHash,
       },
     });
 
     // 4. If successful, create reputation event
-    if (status === 'completed') {
-      await tx.reputationEvent.create({
-        data: {
-          worker_id: workerId,
-          event_type: 'task_completed',
-          delta: 10, // Base reputation increase
-          reason: 'Payment completed successfully',
-          related_id: taskId,
+    if (status === 'confirmed') {
+      // Get current worker reputation
+      const [worker] = await tx
+        .select({ reputationScore: schema.workers.reputationScore })
+        .from(schema.workers)
+        .where(eq(schema.workers.id, workerId));
+
+      if (worker) {
+        const previousScore = worker.reputationScore || 0;
+        const delta = 10; // Base reputation increase
+        const newScore = previousScore + delta;
+
+        await tx.insert(schema.reputationEvents).values({
+          workerId,
+          taskId,
+          eventType: 'task_completed',
+          pointsDelta: delta,
+          previousScore,
+          newScore,
+          description: 'Payment completed successfully',
           metadata: {
             amount: amount.toString(),
             tx_hash: txHash,
           },
-        },
-      });
+        });
+      }
     }
 
     return transaction;
@@ -328,12 +351,12 @@ export async function executeInstantPayment(
     return existingResult;
   }
 
-  const prisma = getPrisma();
+  const db = getDatabase();
 
   try {
     // Step 1: Verify task completion eligibility
     console.log('[Payment] Step 1: Verifying task eligibility');
-    const verification = await verifyTaskEligibility(prisma, taskId, workerId);
+    const verification = await verifyTaskEligibility(db, taskId, workerId);
 
     if (!verification.valid) {
       const errorResult: TransactionResult = {
@@ -367,9 +390,9 @@ export async function executeInstantPayment(
     console.log('[Payment] Step 3: Executing USDC transfer');
     
     // Get worker wallet info
-    const workerWalletId = task.worker.wallet_id;
-    const workerWalletAddress = task.worker.wallet_address;
-    const platformWalletId = task.platform.wallet_address; // Will use as fallback
+    const workerWalletId = task.worker?.walletId;
+    const workerWalletAddress = task.worker?.walletAddress;
+    const platformWalletId = task.platform?.walletAddress; // Will use as fallback
 
     if (!workerWalletId) {
       throw new Error('Worker wallet ID not found');
@@ -395,7 +418,7 @@ export async function executeInstantPayment(
     // Step 5: Update database records
     console.log('[Payment] Step 5: Updating database records');
     const transaction = await updateDatabaseRecords(
-      prisma,
+      db,
       taskId,
       workerId,
       platformId,
@@ -403,7 +426,7 @@ export async function executeInstantPayment(
       fee,
       transferResult.txHash || null,
       transferResult.txId || null,
-      transferResult.success ? 'completed' : 'failed',
+      transferResult.success ? 'confirmed' : 'failed',
       transferResult.error
     );
 
@@ -462,29 +485,44 @@ export async function executeInstantPayment(
  * Get payment transaction by ID
  */
 export async function getPaymentTransaction(transactionId: string): Promise<any> {
-  const prisma = getPrisma();
+  const db = getDatabase();
   
-  return prisma.transaction.findUnique({
-    where: { id: transactionId },
-    include: {
+  // Get transaction with related data
+  const transaction = await db.query.transactions.findFirst({
+    where: eq(schema.transactions.id, transactionId),
+    with: {
       worker: {
-        select: {
+        columns: {
           id: true,
           name: true,
           email: true,
-          wallet_address: true,
-        },
-      },
-      task: {
-        select: {
-          id: true,
-          title: true,
-          task_type: true,
-          status: true,
+          walletAddress: true,
         },
       },
     },
   });
+
+  if (!transaction) return null;
+
+  // Get task info manually
+  if (transaction.taskId) {
+    const task = await db.query.tasks.findFirst({
+      where: eq(schema.tasks.id, transaction.taskId),
+      columns: {
+        id: true,
+        title: true,
+        type: true,
+        status: true,
+      },
+    });
+    
+    return {
+      ...transaction,
+      task,
+    };
+  }
+
+  return transaction;
 }
 
 /**
@@ -498,27 +536,39 @@ export async function getWorkerPayments(
     status?: string;
   }
 ): Promise<any[]> {
-  const prisma = getPrisma();
+  const db = getDatabase();
   
-  return prisma.transaction.findMany({
-    where: {
-      worker_id: workerId,
-      tx_type: 'payout',
-      ...(options?.status && { status: options.status }),
-    },
-    include: {
-      task: {
-        select: {
+  // Build query with optional status filter
+  const transactions = await db.query.transactions.findMany({
+    where: and(
+      eq(schema.transactions.workerId, workerId),
+      eq(schema.transactions.type, 'payout'),
+      options?.status ? eq(schema.transactions.status, options.status as any) : undefined
+    ),
+    orderBy: [desc(schema.transactions.createdAt)],
+    limit: options?.limit || 50,
+    offset: options?.offset || 0,
+  });
+
+  // Get task info for each transaction
+  const enrichedTransactions = await Promise.all(
+    transactions.map(async (tx) => {
+      if (!tx.taskId) return { ...tx, task: null };
+      
+      const task = await db.query.tasks.findFirst({
+        where: eq(schema.tasks.id, tx.taskId),
+        columns: {
           id: true,
           title: true,
-          task_type: true,
+          type: true,
         },
-      },
-    },
-    orderBy: { created_at: 'desc' },
-    take: options?.limit || 50,
-    skip: options?.offset || 0,
-  });
+      });
+      
+      return { ...tx, task };
+    })
+  );
+
+  return enrichedTransactions;
 }
 
 /**
@@ -531,31 +581,42 @@ export async function getWorkerPaymentStats(workerId: string): Promise<{
   successRate: number;
   averagePaymentTime: number;
 }> {
-  const prisma = getPrisma();
+  const db = getDatabase();
   
-  const stats = await prisma.transaction.aggregate({
-    where: {
-      worker_id: workerId,
-      tx_type: 'payout',
-    },
-    _count: true,
-    _sum: {
-      amount: true,
-      fee: true,
-    },
-  });
+  // Import aggregation functions
+  const { count, sum } = await import('drizzle-orm');
+  
+  // Get aggregate stats
+  const [stats] = await db
+    .select({
+      totalCount: count(),
+      totalAmount: sum(schema.transactions.amountUsdc),
+      totalFees: sum(schema.transactions.feeUsdc),
+    })
+    .from(schema.transactions)
+    .where(
+      and(
+        eq(schema.transactions.workerId, workerId),
+        eq(schema.transactions.type, 'payout')
+      )
+    );
 
-  const successfulPayments = await prisma.transaction.count({
-    where: {
-      worker_id: workerId,
-      tx_type: 'payout',
-      status: 'completed',
-    },
-  });
+  // Get successful payment count
+  const [successStats] = await db
+    .select({ count: count() })
+    .from(schema.transactions)
+    .where(
+      and(
+        eq(schema.transactions.workerId, workerId),
+        eq(schema.transactions.type, 'payout'),
+        eq(schema.transactions.status, 'confirmed')
+      )
+    );
 
-  const totalPayments = stats._count || 0;
-  const totalAmount = parseFloat(stats._sum.amount?.toString() || '0');
-  const totalFees = parseFloat(stats._sum.fee?.toString() || '0');
+  const totalPayments = stats?.totalCount || 0;
+  const totalAmount = parseFloat(stats?.totalAmount || '0');
+  const totalFees = parseFloat(stats?.totalFees || '0');
+  const successfulPayments = successStats?.count || 0;
   const successRate = totalPayments > 0 ? (successfulPayments / totalPayments) * 100 : 0;
 
   return {
@@ -571,11 +632,12 @@ export async function getWorkerPaymentStats(workerId: string): Promise<{
  * Retry failed payment
  */
 export async function retryFailedPayment(transactionId: string): Promise<TransactionResult> {
-  const prisma = getPrisma();
+  const db = getDatabase();
   
-  const transaction = await prisma.transaction.findUnique({
-    where: { id: transactionId },
-    include: {
+  // Get transaction with related data
+  const transaction = await db.query.transactions.findFirst({
+    where: eq(schema.transactions.id, transactionId),
+    with: {
       task: true,
       worker: true,
     },
@@ -585,7 +647,7 @@ export async function retryFailedPayment(transactionId: string): Promise<Transac
     throw new Error('Transaction not found');
   }
 
-  if (transaction.status === 'completed') {
+  if (transaction.status === 'confirmed') {
     throw new Error('Transaction already completed');
   }
 
@@ -593,12 +655,16 @@ export async function retryFailedPayment(transactionId: string): Promise<Transac
     throw new Error('Task not found for transaction');
   }
 
+  if (!transaction.taskId) {
+    throw new Error('Transaction has no task ID');
+  }
+
   // Execute payment again with new idempotency key
   return executeInstantPayment({
-    taskId: transaction.task_id!,
-    workerId: transaction.worker_id,
-    amount: parseFloat(transaction.amount.toString()),
-    platformId: transaction.task.platform_id,
+    taskId: transaction.taskId,
+    workerId: transaction.workerId!,
+    amount: parseFloat(transaction.amountUsdc),
+    platformId: (transaction.task as any).platformId,
     idempotencyKey: `retry-${transactionId}-${Date.now()}`,
   });
 }

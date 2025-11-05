@@ -3,8 +3,7 @@
 ## 📋 Prerequisites
 
 - Node.js 18+ installed
-- PostgreSQL client (optional, for local testing)
-- Neon.tech account (https://neon.tech)
+- PostgreSQL 16+ (local) OR Neon.tech account (serverless)
 - Circle Developer account (https://console.circle.com)
 
 ## 🚀 Quick Start
@@ -18,71 +17,122 @@ npm install
 
 This will install:
 
-- Prisma ORM and client
-- Neon serverless adapter
+- **Drizzle ORM** (replaced Prisma)
+- Neon serverless adapter (for edge deployment)
+- postgres driver (for local development)
 - Hono framework
 - All necessary dependencies
 
-### 2. Set Up Neon Database
+### 2. Set Up Database
 
-1. Create a Neon account at https://console.neon.tech
-2. Create a new project named `gigstream`
-3. Copy the connection string
-4. Create a `.env` file (copy from `.env.example`):
+**Option A: Local PostgreSQL (Recommended for Development)**
+
+1. Install PostgreSQL 16+
+2. Create database and user:
 
 ```bash
-cp .env.example .env
+sudo -u postgres psql
+CREATE USER gigstream_user WITH PASSWORD 'gigstream_password';
+CREATE DATABASE gigstream_dev OWNER gigstream_user;
 ```
 
-5. Update the `DATABASE_URL` in `.env`:
+3. Update `.env`:
+
+```env
+DATABASE_URL="postgresql://gigstream_user:gigstream_password@localhost:5432/gigstream_dev"
+```
+
+**Option B: Neon Serverless (For Edge Deployment)**
+
+1. Create account at https://console.neon.tech
+2. Create project named `gigstream`
+3. Copy connection string to `.env`:
 
 ```env
 DATABASE_URL="postgresql://user:password@ep-xxx.us-east-2.aws.neon.tech/gigstream_db?sslmode=require"
 ```
 
-### 3. Generate Prisma Client
+### 3. Apply Database Schema
 
 ```bash
-npm run db:generate
+npm run db:push
 ```
 
-This creates the Prisma client from your schema.
+This applies the Drizzle schema to your database (8 tables, 7 enums, 39 indexes).
 
-### 4. Run Database Migration
+### 4. Verify Migration
 
 ```bash
-npm run db:migrate
+npm run test:db
 ```
 
-This will:
+This will test:
 
-- Create all 8 tables (workers, platforms, tasks, streams, transactions, reputation_events, loans, audit_logs)
-- Set up indexes and foreign keys
-- Apply constraints
+- Insert operations (workers, platforms, tasks)
+- Query operations with filtering
+- Update operations
+- Delete operations with foreign key constraints
+- All 8 tables and relationships
 
-### 5. Apply Triggers and Views (Optional but Recommended)
-
-After the initial migration, apply database triggers and views:
+### 5. Test Authentication Service
 
 ```bash
-# Connect to your Neon database
-psql $DATABASE_URL
+npm run test:auth
+```
+
+This validates:
+
+- Password hashing with bcrypt
+- JWT token generation and verification
+- API key generation and hashing
+- Password strength validation (19 tests)
+
+## 📊 Database Schema
+
+The Drizzle ORM schema includes:
+
+- **8 tables**: workers, platforms, tasks, streams, transactions, reputation_events, loans, audit_logs
+- **7 enums**: task_status, task_type, stream_status, transaction_status, transaction_type, loan_status, reputation_event_type
+- **39 indexes**: Optimized for common queries
+- **12 foreign keys**: Enforcing referential integrity
+
+## 🛠️ Available Commands
+
+```bash
+# Database Management
+npm run db:push          # Apply schema to database
+npm run db:generate      # Generate migration files
+npm run db:studio        # Open Drizzle Studio GUI
+npm run db:drop          # Drop schema (destructive)
+
+# Testing
+npm run test:db          # Test database operations
+npm run test:auth        # Test authentication service
+
+# Development
+npm run dev              # Start Wrangler dev server
+npm run deploy           # Deploy to Cloudflare Workers
+```
 
 # Run triggers
+
 \i prisma/triggers.sql
 
 # Run views
+
 \i prisma/views.sql
 
 # Exit
+
 \q
-```
+
+````
 
 Alternatively, you can add these to a custom migration:
 
 ```bash
 npx prisma migrate dev --name add_triggers_and_views --create-only
-```
+````
 
 Then paste the contents of `triggers.sql` and `views.sql` into the generated migration file.
 

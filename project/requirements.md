@@ -73,35 +73,71 @@ GigStream is an AI-powered real-time payment streaming system for gig workers, b
 
 - **ID**: FR-2.2.1
 - **Priority**: High
-- **Description**: AI agent validates task completion before payment release
+- **Description**: AI agent monitors platform APIs and validates task completion before payment release
 - **Requirements**:
-  - Receive task completion events via webhook
-  - Extract and validate task metadata (photos, GPS, timestamps)
-  - Cross-reference with platform API data
-  - Flag suspicious patterns for manual review
-  - Auto-approve low-risk tasks
+  - **Monitoring**: Continuously monitor platform APIs for task completion events
+  - **Automatic Verification**: AI-powered verification via API integration
+  - **Fraud Detection**: Pattern recognition for anomalous behavior using ML models
+  - **Metadata Validation**: Verify task metadata (photos, GPS, timestamp)
+  - **ML Classification**: Binary classifier (approve/flag/reject) with confidence scores
+  - **Auto-approval**: Low-risk tasks approved automatically
 - **Acceptance Criteria**:
   - Verification latency < 500ms for auto-approved tasks
+  - Auto-approval rate > 90% for valid tasks
   - False positive rate < 2%
-  - False negative rate < 0.5%
   - Manual review queue for flagged items
+  - Fraud detection accuracy > 95%
 
 #### FR-2.2.2: Risk Scoring Model
 
 - **ID**: FR-2.2.2
 - **Priority**: High
-- **Description**: ML model assesses worker creditworthiness for advances
+- **Description**: ML model assesses worker creditworthiness for advances using Gradient Boosting
 - **Requirements**:
+  - **Algorithm**: Gradient Boosting (XGBoost) for risk assessment
+  - **Input Features**:
+    - Completion rate (last 30 days)
+    - Average task value
+    - Account age
+    - Dispute count
+    - Rating variance
+    - Time-of-day patterns
+  - **Training Data**: Simulated historical completion data
+  - **Retraining**: Weekly model updates
   - Calculate risk score (0-1000) based on multiple factors
-  - Input features: completion rate, account age, task history, ratings, dispute count
   - Real-time inference via Cloudflare Workers AI
   - Score updates after each completed task
-  - Threshold-based advance eligibility determination
+  - Threshold-based advance eligibility determination (score >= 600)
 - **Acceptance Criteria**:
   - Inference latency < 100ms
   - Model accuracy > 85% on test set (for demo purposes)
   - Scores are explainable (show factor contributions)
   - API endpoint for score retrieval
+
+#### FR-2.2.3: Earnings Prediction Engine
+
+- **ID**: FR-2.2.3
+- **Priority**: Medium
+- **Description**: Forecast worker earnings for advance calculation using time series forecasting
+- **Requirements**:
+  - **Algorithm**: Time series forecasting (Prophet or ARIMA)
+  - **Input Features**:
+    - Historical daily earnings
+    - Day of week patterns
+    - Seasonal patterns
+    - Platform-specific trends
+  - **Target**: Predicted earnings for next 7 days
+  - **Accuracy Goal**: Mean Absolute Percentage Error (MAPE) < 15%
+  - Predict next 7 days earnings based on historical data
+  - Consider day-of-week patterns, seasonality, trends
+  - Provide confidence intervals for predictions
+  - Update predictions daily
+  - Calculate safe advance amount (50-80% of prediction)
+- **Acceptance Criteria**:
+  - Mean Absolute Percentage Error (MAPE) < 15% on demo data (improved from 20%)
+  - Predictions include confidence intervals
+  - Real-time prediction API < 500ms response time
+  - Clear visualization of prediction vs actual
 
 #### FR-2.2.3: Earnings Prediction Engine
 

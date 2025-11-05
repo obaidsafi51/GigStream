@@ -29,7 +29,7 @@ This document breaks down the GigStream MVP implementation into detailed, action
 
 ## Progress Summary (as of November 5, 2025)
 
-**Overall Completion: ~60%**
+**Overall Completion: ~55%** (updated from 60% due to Day 5 scope increase)
 
 ### ✅ Completed (Days 1-4)
 
@@ -46,13 +46,33 @@ This document breaks down the GigStream MVP implementation into detailed, action
 - ✅ Circle Developer-Controlled Wallets integrated
 - ✅ Payment execution service operational
 - ✅ Database with 8 tables + triggers + views
+- ✅ Demo API endpoints with seeded data
 
-### 🚧 In Progress (Days 5-9)
+### ❌ Not Started (Day 5)
 
-- **Day 5**: AI/ML verification and risk scoring (pending)
+- **Day 5**: AI/ML models (XGBoost, Prophet, fraud detection) - **CRITICAL PATH**
+  - ❌ Task 5.1: Task Verification Agent (AI + Fraud Detection) - 4 hours
+  - ❌ Task 5.2: Risk Scoring Engine (XGBoost) - 4 hours
+  - ❌ Task 5.3: Earnings Prediction Engine (Prophet) - 3 hours
+  - ❌ Task 5.4: Webhook Handler Implementation - 2 hours
+  - **Total:** 13 hours of work remaining
+
+### 🚧 In Progress (Days 6-9)
+
+- **Day 5**: AI/ML models (XGBoost risk scoring, Prophet earnings prediction, fraud detection) - ❌ NOT STARTED
 - **Day 6**: Frontend foundation (auth pages completed, dashboard pending)
 - **Day 7-8**: Worker dashboard UI and advance system
 - **Day 9**: Platform admin dashboard
+
+**⚠️ Day 5 AI/ML Implementation Note:**
+
+Task 5 has been updated to reflect PRD specifications:
+
+- **Task Verification**: AI-powered with fraud detection and pattern recognition
+- **Risk Scoring**: Gradient Boosting (XGBoost) with weekly retraining (MAPE target updated)
+- **Earnings Prediction**: Time series forecasting (Prophet) with <15% MAPE target
+- **MVP Approach**: Heuristic fallbacks acceptable for hackathon demo
+- **Production Vision**: Full ML models represent post-MVP enhancement
 
 ### 📋 Remaining (Days 10-13)
 
@@ -842,67 +862,105 @@ Successfully implemented comprehensive blockchain service with complete coverage
 
 ---
 
-## Day 5: Webhook System & Task Verification
+## Day 5: AI/ML Models & Task Verification
 
-**Goal:** Build webhook receiver and AI-powered task verification
+**Goal:** Implement AI-powered task verification, risk scoring, and earnings prediction
 
-### Task 5.1: Webhook Handler Implementation
-
-**Owner:** FS  
-**Time:** 3 hours  
-**Dependencies:** Task 3.3
-
-**Deliverables:**
-
-- [ ] Implement `POST /api/v1/webhooks/task-completed`
-- [ ] Webhook payload validation (Zod schema)
-- [ ] HMAC signature verification
-- [ ] Queue task for verification
-- [ ] Acknowledge webhook immediately (<200ms)
-- [ ] Implement retry logic for failed webhooks
-- [ ] Add dead letter queue for problematic webhooks
-
-**Acceptance Criteria:**
-
-- Webhooks are received and validated
-- Response time <200ms
-- Signature verification prevents spoofing
-- Failed webhooks are retried 3 times
-
-### Task 5.2: Task Verification Agent (AI/Heuristic)
+### Task 5.1: Task Verification Agent (AI + Fraud Detection)
 
 **Owner:** FS  
 **Time:** 4 hours  
-**Dependencies:** Task 5.1
+**Dependencies:** Task 4.3
 
 **Deliverables:**
 
-- [ ] Create `services/verification.ts`
-- [ ] Implement verification flow:
+- [ ] Create `services/verification.ts` with AI integration
+- [ ] Implement verification flow with fraud detection:
   ```typescript
   async function verifyTaskCompletion(
     taskData: TaskCompletionData
   ): Promise<VerificationResult>;
   ```
+- [ ] **AI Integration**: Use Cloudflare Workers AI for pattern recognition
+- [ ] **Fraud Detection**: Implement anomaly detection for suspicious patterns
 - [ ] Fast-path checks (design.md Section 5.1.2):
   - Required fields present
   - Timestamp reasonable (not in future, within 24h)
   - Amount within limits ($1-1000)
   - Photo attachments exist (if required)
-- [ ] AI verification (if time permits):
-  - Use Cloudflare Workers AI for image verification
-  - OR use simple heuristic scoring
-- [ ] Return verdict: 'approve' | 'flag' | 'reject'
-- [ ] Log all verification decisions
+  - GPS validation (if geofence provided)
+- [ ] AI verification layer:
+  - Use Cloudflare Workers AI for image/metadata verification
+  - Pattern recognition for anomalous behavior
+  - Confidence scoring
+- [ ] Return verdict: 'approve' | 'flag' | 'reject' with confidence score
+- [ ] Log all verification decisions with reasoning
+- [ ] Implement auto-monitoring of platform APIs for completion events
 
 **Acceptance Criteria:**
 
-- Verification latency <500ms
-- Auto-approval rate >90% for valid tasks
-- False positive rate <2%
-- All decisions are logged
+- ❌ Verification latency <500ms for auto-approved tasks
+- ❌ Auto-approval rate >90% for valid tasks
+- ❌ False positive rate <2%
+- ❌ Fraud detection accuracy >95%
+- ❌ All decisions are logged with reasoning
+- ❌ API monitoring for task completion events
 
-### Task 5.3: Risk Scoring Engine
+**Status:** ❌ NOT STARTED
+
+### Task 5.2: Risk Scoring Engine (XGBoost)
+
+**Owner:** FS  
+**Time:** 4 hours  
+**Dependencies:** Task 1.4
+
+**Deliverables:**
+
+- [ ] Create `services/risk.ts` with XGBoost integration
+- [ ] Implement risk scoring function (PRD Section 6.4 + design.md Section 5.2):
+  ```typescript
+  function calculateRiskScore(workerId: string): RiskScore;
+  ```
+- [ ] **Algorithm**: Implement Gradient Boosting (XGBoost) model
+- [ ] **Input Features** (from PRD):
+  - Completion rate (last 30 days)
+  - Average task value
+  - Account age
+  - Dispute count
+  - Rating variance
+  - Time-of-day patterns
+  - Reputation score (from blockchain)
+  - Loan repayment history
+  - Earnings volatility
+- [ ] **Training Data**: Generate simulated historical completion data
+- [ ] **Model Config**:
+  - Score range: 0-1000
+  - Eligibility threshold: >= 600
+  - Weekly retraining schedule
+- [ ] **Heuristic Fallback**: Rule-based scoring if XGBoost unavailable (MVP)
+- [ ] Scoring factors:
+  - Completion rate (30 points)
+  - Account age (15 points)
+  - Task count (20 points)
+  - Average rating (20 points)
+  - Dispute rate (15 points penalty)
+  - Consistency (10 points)
+- [ ] Base score: 100
+- [ ] Cache scores for 5 minutes
+- [ ] Return explainable scores (feature importance)
+
+**Acceptance Criteria:**
+
+- ❌ Score calculation <100ms
+- ❌ Scores update after each task
+- ❌ XGBoost model or heuristic fallback implemented
+- ❌ Algorithm matches PRD Section 6.4 specifications
+- ❌ Model accuracy >85% on test set (for demo)
+- ❌ API endpoint returns score with factor breakdown
+
+**Status:** ❌ NOT STARTED
+
+### Task 5.3: Earnings Prediction Engine (Prophet)
 
 **Owner:** FS  
 **Time:** 3 hours  
@@ -910,27 +968,71 @@ Successfully implemented comprehensive blockchain service with complete coverage
 
 **Deliverables:**
 
-- [ ] Create `services/risk.ts`
-- [ ] Implement risk scoring function (design.md Section 5.2):
+- [ ] Create `services/prediction.ts` with Prophet integration
+- [ ] Implement earnings prediction (PRD Section 6.4 + requirements.md FR-2.2.3):
   ```typescript
-  function calculateRiskScore(workerId: string): RiskScore;
+  function predictEarnings(workerId: string, days: number): EarningsPrediction;
   ```
-- [ ] Scoring factors:
-  - Completion rate (30 points)
-  - Account age (15 points)
-  - Task count (20 points)
-  - Average rating (20 points)
-  - Dispute rate (15 points)
-  - Consistency (10 points)
-- [ ] Base score: 100
-- [ ] Score range: 0-1000
-- [ ] Cache scores for 5 minutes
+- [ ] **Algorithm**: Time series forecasting (Prophet or ARIMA)
+- [ ] **Input Features** (from PRD):
+  - Historical daily earnings (min 30 days)
+  - Day of week patterns
+  - Seasonal patterns
+  - Platform-specific trends
+- [ ] **Target**: Next 7-day earnings forecast
+- [ ] **Accuracy Goal**: MAPE < 15% (improved from 20%)
+- [ ] **Prophet Configuration**:
+  - Weekly seasonality enabled
+  - 80% confidence intervals
+  - Changepoint detection
+- [ ] **Heuristic Fallback**: Moving average + day-of-week patterns (MVP)
+- [ ] Algorithm (fallback):
+  - Calculate day-of-week averages
+  - Apply trend adjustment
+  - Use recency weighting (last 7 days)
+  - Calculate confidence interval
+- [ ] Return prediction with breakdown and confidence
+- [ ] Safe advance calculation: 50-80% of predicted earnings
 
 **Acceptance Criteria:**
 
-- Score calculation <100ms
-- Scores update after each task
-- Algorithm matches design.md Section 5.2.2
+- ❌ Prediction calculation <2 seconds
+- ❌ MAPE <15% on demo data (improved target)
+- ❌ Prophet model or moving average fallback implemented
+- ❌ Confidence intervals are reasonable
+- ❌ Daily prediction updates
+- ❌ API endpoint with visualization-ready data
+
+**Status:** ❌ NOT STARTED
+
+**Note:** For MVP implementation, heuristic fallbacks are acceptable. Full ML models (XGBoost, Prophet) represent production vision from PRD and can be implemented post-hackathon.
+
+### Task 5.4: Webhook Handler Implementation
+
+**Owner:** FS  
+**Time:** 2 hours  
+**Dependencies:** Task 5.1
+
+**Deliverables:**
+
+- [ ] Implement `POST /api/v1/webhooks/task-completed` in `routes/webhooks.ts`
+- [ ] Webhook payload validation (Zod schema)
+- [ ] HMAC-SHA256 signature verification (from `X-Signature` header)
+- [ ] Queue task for verification (call verification service)
+- [ ] Acknowledge webhook immediately (<200ms)
+- [ ] Implement retry logic for failed webhooks (3 attempts with exponential backoff)
+- [ ] Add dead letter queue for problematic webhooks
+- [ ] Request logging for audit trail
+
+**Acceptance Criteria:**
+
+- ❌ Webhooks are received and validated
+- ❌ Response time <200ms
+- ❌ Signature verification prevents spoofing (HMAC-SHA256)
+- ❌ Failed webhooks are retried 3 times
+- ❌ Integration with Task 5.1 verification service
+
+**Status:** ❌ NOT STARTED
 
 ---
 

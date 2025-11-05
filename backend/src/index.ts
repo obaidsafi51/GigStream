@@ -58,6 +58,22 @@ app.use(
 // Rate limiting (100 req/min per user)
 app.use('/api/*', rateLimiter({ windowMs: 60000, max: 100 }));
 
+// Root endpoint
+app.get('/', (c) => {
+  return c.json({
+    name: 'GigStream API',
+    version: '1.0.0',
+    description: 'AI-powered real-time USDC payment streaming for gig workers',
+    endpoints: {
+      health: '/health',
+      api: '/api/v1',
+      docs: 'https://github.com/GigStream/api-docs',
+    },
+    status: 'online',
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // Health check endpoint
 app.get('/health', (c) => {
   return c.json({
@@ -65,6 +81,20 @@ app.get('/health', (c) => {
     timestamp: new Date().toISOString(),
     version: '1.0.0',
     service: 'gigstream-api',
+  });
+});
+
+// API info endpoint
+app.get('/api/v1', (c) => {
+  return c.json({
+    version: 'v1',
+    endpoints: [
+      { path: '/api/v1/auth/*', description: 'Authentication endpoints' },
+      { path: '/api/v1/workers/*', description: 'Worker management' },
+      { path: '/api/v1/platforms/*', description: 'Platform management' },
+      { path: '/api/v1/webhooks/*', description: 'Webhook handlers' },
+      { path: '/api/v1/demo/*', description: 'Demo endpoints' },
+    ],
   });
 });
 
