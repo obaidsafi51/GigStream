@@ -856,21 +856,25 @@ This section documents changes made during implementation that deviate from orig
 ### 10.1 Technology Stack Updates
 
 **Frontend Framework Upgrade:**
+
 - **Original**: React 18+, Tailwind CSS 3+
 - **Implemented**: Next.js 15 App Router with React 19 RC, Tailwind CSS 4
 - **Rationale**: React 19 Server Components provide better performance and SEO. Tailwind CSS 4 offers improved build times with Oxide engine.
 
 **State Management Decision:**
+
 - **Original**: "React Context / Zustand" (both options)
 - **Implemented**: Zustand exclusively
 - **Rationale**: Simpler API, better performance, and easier testing compared to Context API.
 
 **Backend Framework:**
+
 - **Original**: "Express.js / Hono" (both options)
 - **Implemented**: Hono exclusively
 - **Rationale**: Hono is specifically designed for Cloudflare Workers edge runtime with better performance.
 
 **Database & ORM:**
+
 - **Original**: PostgreSQL 15+, "Prisma / Drizzle" (both options)
 - **Implemented**: PostgreSQL 16.10 (Neon serverless), Prisma with @prisma/adapter-neon
 - **Rationale**: PostgreSQL 16 offers better performance. Prisma chosen for mature ecosystem and better TypeScript support.
@@ -883,6 +887,7 @@ This section documents changes made during implementation that deviate from orig
 ### 10.2 Gas Cost Adjustments
 
 **Smart Contract Gas Costs:**
+
 - **Original Requirement**: <50,000 gas per operation
 - **Actual Measurements**:
   - `createStream`: ~348k gas (7x original estimate)
@@ -892,6 +897,7 @@ This section documents changes made during implementation that deviate from orig
   - `approveLoan`: ~234k gas
 
 **Rationale**: Original estimates did not account for:
+
 - USDC ERC-20 transfer operations (~21k base gas)
 - Storage slot initialization (SSTORE cold: 20k gas)
 - Complex struct storage
@@ -914,23 +920,27 @@ This section documents changes made during implementation that deviate from orig
 **⚠️ Known Limitation**: Prisma was not originally designed for edge runtimes like Cloudflare Workers.
 
 **Current Workaround:**
+
 - Using `@prisma/adapter-neon` with Neon's HTTP driver
 - This enables Prisma to work in Cloudflare Workers via HTTP queries instead of WebSocket connections
 - Connection pooling handled by Neon serverless, not Prisma Client
 
 **Limitations:**
+
 - ❌ Slower cold starts (Prisma Client bundle ~1MB+)
 - ❌ Increased response latency vs native edge ORMs
 - ❌ Some Prisma features unavailable (interactive transactions, middleware)
 - ❌ Not utilizing Workers' distributed edge network optimally
 
 **Why This Works for MVP:**
+
 - ✅ Prisma Studio provides excellent database GUI for development
 - ✅ Mature migration tooling and extensive documentation
 - ✅ Team familiarity with Prisma reduces development time
 - ✅ Neon adapter makes it functional (not optimal, but functional)
 
 **Production Recommendation:**
+
 - Migrate to **Drizzle ORM** for production deployment
 - Drizzle is purpose-built for edge runtimes:
   - ~100KB bundle size (10x smaller)
@@ -940,6 +950,7 @@ This section documents changes made during implementation that deviate from orig
   - SQL-like syntax for complex queries
 
 **Migration Path:**
+
 1. Keep Prisma for MVP completion (deadline: Nov 8)
 2. Create Drizzle schema from existing Prisma schema (post-hackathon)
 3. Generate migrations using `drizzle-kit`
@@ -948,6 +959,7 @@ This section documents changes made during implementation that deviate from orig
 6. Deploy to production
 
 **Resources:**
+
 - Neon + Prisma: https://neon.tech/docs/guides/prisma
 - Drizzle ORM: https://orm.drizzle.team/
 - Migration guide: https://orm.drizzle.team/docs/prisma
@@ -955,6 +967,7 @@ This section documents changes made during implementation that deviate from orig
 ### 10.6 Completed vs Planned Features
 
 **Fully Implemented (as of Nov 5, 2025):**
+
 - ✅ All 3 smart contracts deployed to Arc testnet
 - ✅ Backend API with Hono + Cloudflare Workers
 - ✅ Authentication system (JWT + API keys)
@@ -965,11 +978,13 @@ This section documents changes made during implementation that deviate from orig
 - ✅ Frontend auth pages and layout components
 
 **In Progress:**
+
 - 🚧 Worker dashboard UI (Tasks 7.1-8.5)
 - 🚧 Platform admin dashboard (Tasks 9.1-9.2)
 - 🚧 AI/ML verification and risk scoring (Tasks 5.1-5.3)
 
 **Deferred to Post-MVP:**
+
 - ⏸️ Redis caching (using in-memory for MVP)
 - ⏸️ Advanced monitoring/alerting
 - ⏸️ Two-factor authentication
