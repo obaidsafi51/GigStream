@@ -337,6 +337,7 @@ The database uses PostgreSQL 16+ (Neon serverless) with the following design pri
 - Timestamp tracking (created_at, updated_at)
 
 **ORM & Edge Compatibility:**
+
 - **Current**: Prisma with `@prisma/adapter-neon` (MVP implementation)
 - **Limitation**: Prisma not optimized for Cloudflare Workers edge runtime
 - **Workaround**: Using Neon's HTTP adapter for edge compatibility
