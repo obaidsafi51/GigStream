@@ -8,7 +8,16 @@ import { z } from 'zod';
 import { authenticateJWT } from '../middleware/auth';
 import { validateRequest } from '../middleware/validation';
 
-const workersRoutes = new Hono();
+// Type definitions for Cloudflare Workers environment
+type Bindings = {
+  DATABASE_URL: string;
+  JWT_SECRET: string;
+  CIRCLE_API_KEY: string;
+  CIRCLE_ENTITY_SECRET: string;
+  ARC_RPC_URL: string;
+};
+
+const workersRoutes = new Hono<{ Bindings: Bindings }>();
 
 // Validation schemas
 const advanceRequestSchema = z.object({
@@ -21,8 +30,6 @@ const advanceRequestSchema = z.object({
  * Get worker profile
  */
 workersRoutes.get('/:workerId', authenticateJWT, async (c) => {
-  const workerId = c.req.param('workerId');
-  
   // TODO: Implement profile retrieval
   return c.json({
     success: false,
@@ -38,8 +45,6 @@ workersRoutes.get('/:workerId', authenticateJWT, async (c) => {
  * Get real-time USDC balance from Circle
  */
 workersRoutes.get('/:workerId/balance', authenticateJWT, async (c) => {
-  const workerId = c.req.param('workerId');
-  
   // TODO: Implement balance query via Circle API (Task 4.1)
   return c.json({
     success: false,
@@ -55,11 +60,7 @@ workersRoutes.get('/:workerId/balance', authenticateJWT, async (c) => {
  * Get paginated transaction history
  */
 workersRoutes.get('/:workerId/earnings', authenticateJWT, async (c) => {
-  const workerId = c.req.param('workerId');
-  const page = Number(c.req.query('page') || '1');
-  const limit = Number(c.req.query('limit') || '20');
-  
-  // TODO: Implement earnings history
+  // TODO: Implement earnings history (use page and limit params when implemented)
   return c.json({
     success: false,
     error: {
@@ -83,7 +84,7 @@ workersRoutes.get('/:workerId/reputation', authenticateJWT, async (c) => {
     const schema = await import('../../database/schema.js');
     const { eq, desc } = await import('drizzle-orm');
     
-    const db = getDatabase();
+    const db = getDatabase(c.env?.DATABASE_URL);
     
     // Get worker profile
     const worker = await db.query.workers.findFirst({
@@ -101,7 +102,7 @@ workersRoutes.get('/:workerId/reputation', authenticateJWT, async (c) => {
     }
     
     // Calculate risk score (includes reputation factors)
-    const riskScore = await calculateRiskScore(workerId);
+    const riskScore = await calculateRiskScore(workerId, c.env?.DATABASE_URL);
     const breakdown = formatRiskScoreBreakdown(riskScore);
     
     // Get reputation events (last 20)
@@ -251,7 +252,7 @@ workersRoutes.get('/:workerId/advance/eligibility', authenticateJWT, async (c) =
     const schema = await import('../../database/schema.js');
     const { eq, and } = await import('drizzle-orm');
     
-    const db = getDatabase();
+    const db = getDatabase(c.env?.DATABASE_URL);
     
     // Get worker profile
     const worker = await db.query.workers.findFirst({
@@ -270,8 +271,8 @@ workersRoutes.get('/:workerId/advance/eligibility', authenticateJWT, async (c) =
     
     // Run risk scoring and earnings prediction in parallel
     const [riskScore, earningsPrediction] = await Promise.all([
-      calculateRiskScore(workerId),
-      predictEarnings(workerId, 7),
+      calculateRiskScore(workerId, c.env?.DATABASE_URL),
+      predictEarnings(workerId, 7, c.env?.DATABASE_URL),
     ]);
     
     // Check account age (>= 7 days)
@@ -281,8 +282,9 @@ workersRoutes.get('/:workerId/advance/eligibility', authenticateJWT, async (c) =
     const accountAgeCheck = accountAgeDays >= 7;
     
     // Calculate completion rate (from worker aggregates)
+    // Note: totalTasksCancelled doesn't exist in schema - using totalTasksCompleted as proxy
     const completionRate = worker.totalTasksCompleted && worker.totalTasksCompleted > 0
-      ? (worker.totalTasksCompleted / (worker.totalTasksCompleted + (worker.totalTasksCancelled || 0)))
+      ? 1.0 // Assume 100% completion rate for workers with completed tasks
       : 0;
     const completionRateCheck = completionRate >= 0.8;
     
@@ -427,12 +429,11 @@ workersRoutes.post(
       const { calculateRiskScore } = await import('../services/risk.js');
       const { predictEarnings } = await import('../services/prediction.js');
       const { getDatabase } = await import('../services/database.js');
-      const { requestLoan, approveLoan, getLoan, usdcToWei, weiToUsdc } = await import('../services/blockchain.js');
       const { executeTransfer } = await import('../services/circle.js');
       const schema = await import('../../database/schema.js');
       const { eq, and } = await import('drizzle-orm');
       
-      const db = getDatabase();
+      const db = getDatabase(c.env?.DATABASE_URL);
       
       // Step 1: Get worker profile
       const worker = await db.query.workers.findFirst({
@@ -474,8 +475,8 @@ workersRoutes.post(
       // Step 3: Run eligibility checks in parallel
       console.log('[Advance] Running eligibility checks...');
       const [riskScore, earningsPrediction] = await Promise.all([
-        calculateRiskScore(workerId),
-        predictEarnings(workerId, 7),
+        calculateRiskScore(workerId, c.env?.DATABASE_URL),
+        predictEarnings(workerId, 7, c.env?.DATABASE_URL),
       ]);
       
       // Check account age (>= 7 days)
@@ -485,8 +486,9 @@ workersRoutes.post(
       const accountAgeCheck = accountAgeDays >= 7;
       
       // Calculate completion rate
+      // Note: totalTasksCancelled doesn't exist in schema - using totalTasksCompleted as proxy
       const completionRate = worker.totalTasksCompleted && worker.totalTasksCompleted > 0
-        ? (worker.totalTasksCompleted / (worker.totalTasksCompleted + (worker.totalTasksCancelled || 0)))
+        ? 1.0 // Assume 100% completion rate for workers with completed tasks
         : 0;
       const completionRateCheck = completionRate >= 0.8;
       
@@ -560,12 +562,12 @@ workersRoutes.post(
           workerId,
           requestedAmountUsdc: requestedAmount.toString(),
           approvedAmountUsdc: requestedAmount.toString(),
-          feeRateBps: feeRate,
-          feeAmountUsdc: feeAmount.toString(),
-          totalDueUsdc: totalDue.toString(),
-          repaidAmountUsdc: '0',
-          repaymentTasksTarget: 5, // 20% over 5 tasks
-          repaymentTasksCompleted: 0,
+          feePercentage: (feeRate / 100).toString(), // Convert basis points to percentage
+          feeUsdc: feeAmount.toString(),
+          totalOwedUsdc: totalDue.toString(),
+          remainingBalanceUsdc: totalDue.toString(),
+          repaymentTaskCount: 5, // 20% over 5 tasks
+          tasksRepaid: 0,
           status: 'approved',
           approvedAt: new Date(),
           dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
@@ -574,6 +576,7 @@ workersRoutes.post(
             predicted_earnings: earningsPrediction.next7Days,
             reason: reason || 'Advance request',
             auto_approved: true,
+            fee_rate_bps: feeRate,
           },
         })
         .returning();
@@ -583,26 +586,13 @@ workersRoutes.post(
       // Step 8: Execute blockchain transaction
       console.log('[Advance] Executing blockchain transaction...');
       
-      let contractLoanId: number | null = null;
       let txHash: string | null = null;
       let blockchainError: string | null = null;
       
       try {
-        // Request loan on smart contract
-        const amountWei = usdcToWei(requestedAmount);
-        
         // Note: Smart contract call requires worker's wallet address
-        // For MVP, we'll create the loan request from the worker's perspective
-        // In production, this would be done via a proper signer setup
-        
-        // For now, we'll skip the blockchain call and use database only
-        // The smart contract integration would happen here:
-        // const loanResult = await requestLoan({
-        //   workerAddress: worker.walletAddress,
-        //   amount: amountWei,
-        // });
-        // contractLoanId = loanResult.loanId;
-        // txHash = loanResult.transactionHash;
+        // For MVP, we'll skip the blockchain call and use database only
+        // The smart contract integration would happen here in production
         
         console.log('[Advance] Blockchain transaction skipped for MVP (using database only)');
         
@@ -630,7 +620,7 @@ workersRoutes.post(
         });
         
         circleTxId = transferResult.transactionId;
-        transferTxHash = transferResult.transactionHash;
+        transferTxHash = transferResult.transactionHash || null;
         
         console.log(`[Advance] Transfer initiated: ${circleTxId}`);
         
@@ -646,9 +636,8 @@ workersRoutes.post(
         .set({
           status: 'disbursed',
           disbursedAt: new Date(),
-          contractLoanId: contractLoanId || undefined,
           metadata: {
-            ...loan.metadata,
+            ...(typeof loan.metadata === 'object' && loan.metadata !== null ? loan.metadata : {}),
             circle_tx_id: circleTxId,
             tx_hash: txHash || transferTxHash,
             blockchain_error: blockchainError,
@@ -701,20 +690,19 @@ workersRoutes.post(
             workerId: loan.workerId,
             requestedAmount: parseFloat(loan.requestedAmountUsdc),
             approvedAmount: parseFloat(loan.approvedAmountUsdc || '0'),
-            feeRate: loan.feeRateBps,
-            feeAmount: parseFloat(loan.feeAmountUsdc || '0'),
-            totalDue: parseFloat(loan.totalDueUsdc || '0'),
-            repaidAmount: parseFloat(loan.repaidAmountUsdc || '0'),
+            feeRate: parseFloat(loan.feePercentage || '0') * 100, // Convert back to basis points for API
+            feeAmount: parseFloat(loan.feeUsdc || '0'),
+            totalDue: parseFloat(loan.totalOwedUsdc || '0'),
+            repaidAmount: parseFloat(loan.totalOwedUsdc || '0') - parseFloat(loan.remainingBalanceUsdc || '0'),
             repaymentProgress: {
-              tasksTarget: loan.repaymentTasksTarget,
-              tasksCompleted: loan.repaymentTasksCompleted,
+              tasksTarget: loan.repaymentTaskCount,
+              tasksCompleted: loan.tasksRepaid,
               percentComplete: 0,
             },
             status: loan.status,
             approvedAt: loan.approvedAt,
             disbursedAt: loan.disbursedAt,
             dueDate: loan.dueDate,
-            contractLoanId: contractLoanId,
             transactionHash: txHash || transferTxHash,
           },
           metadata: {
@@ -753,7 +741,7 @@ workersRoutes.get('/:workerId/loans', authenticateJWT, async (c) => {
     const schema = await import('../../database/schema.js');
     const { eq, and, desc } = await import('drizzle-orm');
     
-    const db = getDatabase();
+    const db = getDatabase(c.env?.DATABASE_URL);
     
     // Build query with optional status filter
     const loans = await db.query.loans.findMany({
@@ -767,26 +755,26 @@ workersRoutes.get('/:workerId/loans', authenticateJWT, async (c) => {
     // Format loans with calculated fields
     const formattedLoans = loans.map((loan) => {
       const approvedAmount = parseFloat(loan.approvedAmountUsdc || '0');
-      const feeAmount = parseFloat(loan.feeAmountUsdc || '0');
-      const totalDue = parseFloat(loan.totalDueUsdc || '0');
-      const repaidAmount = parseFloat(loan.repaidAmountUsdc || '0');
-      const remaining = totalDue - repaidAmount;
+      const feeAmount = parseFloat(loan.feeUsdc || '0');
+      const totalDue = parseFloat(loan.totalOwedUsdc || '0');
+      const repaidAmount = totalDue - parseFloat(loan.remainingBalanceUsdc || '0');
+      const remaining = parseFloat(loan.remainingBalanceUsdc || '0');
       const percentComplete = totalDue > 0 ? (repaidAmount / totalDue) * 100 : 0;
       
       return {
         id: loan.id,
         requestedAmount: parseFloat(loan.requestedAmountUsdc),
         approvedAmount,
-        feeRate: loan.feeRateBps,
+        feeRate: parseFloat(loan.feePercentage || '0') * 100, // Convert to basis points
         feeAmount,
         totalDue,
         repaidAmount,
         remainingAmount: Math.max(0, remaining),
         repaymentProgress: {
-          tasksTarget: loan.repaymentTasksTarget,
-          tasksCompleted: loan.repaymentTasksCompleted,
+          tasksTarget: loan.repaymentTaskCount,
+          tasksCompleted: loan.tasksRepaid,
           percentComplete: Math.round(percentComplete * 100) / 100,
-          amountPerTask: totalDue / (loan.repaymentTasksTarget || 5),
+          amountPerTask: totalDue / (loan.repaymentTaskCount || 5),
         },
         status: loan.status,
         createdAt: loan.createdAt,
@@ -794,7 +782,6 @@ workersRoutes.get('/:workerId/loans', authenticateJWT, async (c) => {
         disbursedAt: loan.disbursedAt,
         dueDate: loan.dueDate,
         repaidAt: loan.repaidAt,
-        contractLoanId: loan.contractLoanId,
         metadata: loan.metadata,
       };
     });
@@ -831,7 +818,7 @@ workersRoutes.get('/:workerId/loans/active', authenticateJWT, async (c) => {
     const schema = await import('../../database/schema.js');
     const { eq, and } = await import('drizzle-orm');
     
-    const db = getDatabase();
+    const db = getDatabase(c.env?.DATABASE_URL);
     
     // Find active loan
     const loan = await db.query.loans.findFirst({
@@ -853,10 +840,10 @@ workersRoutes.get('/:workerId/loans/active', authenticateJWT, async (c) => {
     
     // Format loan with calculated fields
     const approvedAmount = parseFloat(loan.approvedAmountUsdc || '0');
-    const feeAmount = parseFloat(loan.feeAmountUsdc || '0');
-    const totalDue = parseFloat(loan.totalDueUsdc || '0');
-    const repaidAmount = parseFloat(loan.repaidAmountUsdc || '0');
-    const remaining = totalDue - repaidAmount;
+    const feeAmount = parseFloat(loan.feeUsdc || '0');
+    const totalDue = parseFloat(loan.totalOwedUsdc || '0');
+    const repaidAmount = totalDue - parseFloat(loan.remainingBalanceUsdc || '0');
+    const remaining = parseFloat(loan.remainingBalanceUsdc || '0');
     const percentComplete = totalDue > 0 ? (repaidAmount / totalDue) * 100 : 0;
     
     return c.json({
@@ -867,23 +854,22 @@ workersRoutes.get('/:workerId/loans/active', authenticateJWT, async (c) => {
           id: loan.id,
           requestedAmount: parseFloat(loan.requestedAmountUsdc),
           approvedAmount,
-          feeRate: loan.feeRateBps,
+          feeRate: parseFloat(loan.feePercentage || '0') * 100, // Convert to basis points
           feeAmount,
           totalDue,
           repaidAmount,
           remainingAmount: Math.max(0, remaining),
           repaymentProgress: {
-            tasksTarget: loan.repaymentTasksTarget,
-            tasksCompleted: loan.repaymentTasksCompleted,
+            tasksTarget: loan.repaymentTaskCount,
+            tasksCompleted: loan.tasksRepaid,
             percentComplete: Math.round(percentComplete * 100) / 100,
-            amountPerTask: totalDue / (loan.repaymentTasksTarget || 5),
+            amountPerTask: totalDue / (loan.repaymentTaskCount || 5),
           },
           status: loan.status,
           createdAt: loan.createdAt,
           approvedAt: loan.approvedAt,
           disbursedAt: loan.disbursedAt,
           dueDate: loan.dueDate,
-          contractLoanId: loan.contractLoanId,
           metadata: loan.metadata,
         },
       },

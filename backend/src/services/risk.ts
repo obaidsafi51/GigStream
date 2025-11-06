@@ -70,6 +70,7 @@ const scoreCache = new Map<string, { score: RiskScoreOutput; expiresAt: number }
  * XGBoost model configuration (for future implementation)
  * Currently using heuristic fallback
  */
+// @ts-ignore - Reserved for future XGBoost implementation
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const XGBOOST_CONFIG = {
   objective: 'reg:squarederror',
@@ -86,6 +87,7 @@ const XGBOOST_CONFIG = {
  * Feature weights (approximate, learned from training)
  * These would come from a trained XGBoost model
  */
+// @ts-ignore - Reserved for future XGBoost implementation
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const FEATURE_WEIGHTS = {
   completionRateLast30Days: 0.25,
@@ -104,8 +106,8 @@ const FEATURE_WEIGHTS = {
 /**
  * Collect all input features for risk scoring
  */
-export async function collectRiskInputs(workerId: string): Promise<RiskScoreInputs> {
-  const db = getDatabase();
+export async function collectRiskInputs(workerId: string, databaseUrl?: string): Promise<RiskScoreInputs> {
+  const db = getDatabase(databaseUrl);
 
   // Get worker profile
   const worker = await db.query.workers.findFirst({
@@ -371,15 +373,17 @@ function calculateRiskScoreHeuristic(inputs: RiskScoreInputs): RiskScoreOutput {
 // ===================================
 
 /**
- * Calculate risk score for a worker
- * Uses cached score if available and not expired
+ * Calculate comprehensive risk score for a worker
+ * Returns cached result if available and recent (< 5 minutes)
+ * Otherwise recalculates using XGBoost (if available) or heuristic algorithm
  * 
  * @param workerId - Worker UUID
- * @param forceRefresh - Force recalculation (bypass cache)
- * @returns Risk score with eligibility and advance details
+ * @param databaseUrl - Database connection string (required for Cloudflare Workers)
+ * @param forceRefresh - Bypass cache and recalculate
  */
 export async function calculateRiskScore(
   workerId: string,
+  databaseUrl?: string,
   forceRefresh: boolean = false
 ): Promise<RiskScoreOutput> {
   // Check cache first (unless force refresh)
@@ -391,7 +395,7 @@ export async function calculateRiskScore(
   }
 
   // Collect input features
-  const inputs = await collectRiskInputs(workerId);
+  const inputs = await collectRiskInputs(workerId, databaseUrl);
 
   // Calculate score (try XGBoost, fallback to heuristic)
   let score: RiskScoreOutput;
@@ -549,9 +553,9 @@ async function calculateWeeklyEarnings(
  * Update risk score after task completion
  * Call this after a task is completed to refresh the cache
  */
-export async function updateRiskScoreAfterTask(workerId: string): Promise<void> {
+export async function updateRiskScoreAfterTask(workerId: string, databaseUrl?: string): Promise<void> {
   clearRiskScoreCache(workerId);
-  await calculateRiskScore(workerId, true);
+  await calculateRiskScore(workerId, databaseUrl, true);
 }
 
 /**
