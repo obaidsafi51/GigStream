@@ -24,6 +24,7 @@
     "@neondatabase/serverless": "^0.9.5",
     "@types/bcryptjs": "^2.4.6",
     "bcryptjs": "^3.0.2",
+    "dotenv": "^17.2.3",
     "drizzle-orm": "^0.44.7",
     "ethers": "^6.15.0",
     "hono": "^4.6.3",
