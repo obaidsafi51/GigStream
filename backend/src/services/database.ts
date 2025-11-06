@@ -157,6 +157,114 @@ export const queries = {
   },
 
   /**
+   * Get worker history for verification
+   * Returns aggregated data needed for task verification and fraud detection
+   */
+  async getWorkerHistory(db: ReturnType<typeof getDb>, workerId: string) {
+    // Get worker profile
+    const worker = await db.query.workers.findFirst({
+      where: eq(schema.workers.id, workerId),
+      columns: {
+        id: true,
+        reputationScore: true,
+        totalTasksCompleted: true,
+        totalEarningsUsdc: true,
+        createdAt: true,
+      },
+    });
+
+    if (!worker) {
+      throw new Error('Worker not found');
+    }
+
+    // Get tasks in last 24 hours
+    const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const tasksLast24h = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(schema.tasks)
+      .where(
+        and(
+          eq(schema.tasks.workerId, workerId),
+          lte(last24h, schema.tasks.completedAt)
+        )
+      );
+
+    // Get average task amount
+    const avgAmountResult = await db
+      .select({ 
+        avg: sql<string>`COALESCE(AVG(${schema.tasks.paymentAmountUsdc}), 0)` 
+      })
+      .from(schema.tasks)
+      .where(
+        and(
+          eq(schema.tasks.workerId, workerId),
+          eq(schema.tasks.status, 'completed')
+        )
+      );
+
+    // Get disputes count
+    const disputesResult = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(schema.tasks)
+      .where(
+        and(
+          eq(schema.tasks.workerId, workerId),
+          eq(schema.tasks.status, 'disputed')
+        )
+      );
+
+    // Get recent tasks (last 30 days) for pattern analysis
+    const last30Days = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const recentTasks = await db.query.tasks.findMany({
+      where: and(
+        eq(schema.tasks.workerId, workerId),
+        lte(last30Days, schema.tasks.createdAt)
+      ),
+      columns: {
+        paymentAmountUsdc: true,
+        completedAt: true,
+        estimatedDurationMinutes: true,
+        actualDurationMinutes: true,
+        verificationData: true,
+      },
+      orderBy: [desc(schema.tasks.completedAt)],
+      limit: 50,
+    });
+
+    // Calculate account age
+    const accountAgeDays = Math.floor(
+      (Date.now() - worker.createdAt.getTime()) / (24 * 60 * 60 * 1000)
+    );
+
+    // Calculate completion rate
+    const totalTasks = worker.totalTasksCompleted || 0;
+    const disputes = disputesResult[0]?.count || 0;
+    const completionRate = totalTasks > 0 ? totalTasks / (totalTasks + disputes) : 1;
+
+    // Parse recent tasks for fraud detection
+    const recentTasksFormatted = recentTasks.map(task => ({
+      amount: parseFloat(task.paymentAmountUsdc),
+      duration: task.actualDurationMinutes || task.estimatedDurationMinutes || 0,
+      gps: task.verificationData?.gpsCoordinates ? {
+        lat: task.verificationData.gpsCoordinates.lat,
+        lon: task.verificationData.gpsCoordinates.lon,
+      } : undefined,
+      completedAt: task.completedAt || new Date(),
+    }));
+
+    return {
+      reputationScore: worker.reputationScore || 100,
+      tasksLast24h: tasksLast24h[0]?.count || 0,
+      averageTaskAmount: parseFloat(avgAmountResult[0]?.avg || '0'),
+      disputes,
+      completionRate,
+      totalTasksCompleted: totalTasks,
+      accountAgeDays,
+      recentTasks: recentTasksFormatted,
+    };
+  },
+
+  /**
    * Create task with audit log
    */
   async createTaskWithAudit(

@@ -6,9 +6,15 @@ main = "src/index.ts"
 compatibility_date = "2024-11-01"
 compatibility_flags = ["nodejs_compat"]
 
-# Account and workers.dev subdomain
-# workers_dev = true
-# account_id = "your-account-id"
+# Account and deployment settings
+account_id = "862b03ad21f8a46cdf0fc853a3b3b579"
+workers_dev = true
+preview_urls = false  # Disable preview URLs to suppress warning
+
+# Cloudflare Workers AI Binding (Remote Mode)
+[ai]
+binding = "AI"
+remote = true  # Suppress warning about remote resource usage
 
 # Route configuration (when deploying to custom domain)
 # routes = [
@@ -16,11 +22,22 @@ compatibility_flags = ["nodejs_compat"]
 # ]
 
 # Environment variables (use `wrangler secret put` for sensitive values)
+# Note: Use `wrangler deploy --env production` or `wrangler deploy --env staging`
 [env.production]
 name = "gigstream-api-production"
+account_id = "862b03ad21f8a46cdf0fc853a3b3b579"
+
+[env.production.ai]
+binding = "AI"
+remote = true
 
 [env.staging]
 name = "gigstream-api-staging"
+account_id = "862b03ad21f8a46cdf0fc853a3b3b579"
+
+[env.staging.ai]
+binding = "AI"
+remote = true
 
 # Database bindings (Neon PostgreSQL via HTTP)
 # [env.production.vars]
