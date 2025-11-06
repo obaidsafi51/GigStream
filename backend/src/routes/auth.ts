@@ -21,7 +21,16 @@ import {
 } from '../services/auth';
 import { createWallet } from '../services/circle';
 
-const authRoutes = new Hono();
+// Type definitions for Cloudflare Workers environment
+type Bindings = {
+  DATABASE_URL: string;
+  JWT_SECRET: string;
+  CIRCLE_API_KEY: string;
+  CIRCLE_ENTITY_SECRET: string;
+  ARC_RPC_URL: string;
+};
+
+const authRoutes = new Hono<{ Bindings: Bindings }>();
 
 // Validation schemas
 const registerSchema = z.object({
@@ -69,7 +78,7 @@ authRoutes.post('/register', validateRequest(registerSchema), async (c) => {
       );
     }
 
-    const db = getDatabase();
+    const db = getDatabase(c.env?.DATABASE_URL);
 
     if (type === 'worker') {
       // Check if email already exists
@@ -271,7 +280,7 @@ authRoutes.post('/login', validateRequest(loginSchema), async (c) => {
   try {
     const { email, password } = await c.req.json();
 
-    const db = getDatabase();
+    const db = getDatabase(c.env?.DATABASE_URL);
 
     // Look up worker by email
     const worker = await db.query.workers.findFirst({
@@ -406,7 +415,7 @@ authRoutes.post('/refresh', validateRequest(refreshSchema), async (c) => {
       );
     }
 
-    const db = getDatabase();
+    const db = getDatabase(c.env?.DATABASE_URL);
 
     // Check if user/platform still exists
     if (payload.type === 'worker') {

@@ -80,6 +80,7 @@ const predictionCache = new Map<string, { prediction: EarningsPrediction; expire
  * Prophet model configuration (for future implementation)
  * Currently using heuristic fallback
  */
+// @ts-ignore - Reserved for future Prophet implementation
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const PROPHET_CONFIG = {
   changepoint_prior_scale: 0.05, // Flexibility of trend
@@ -101,9 +102,10 @@ const PROPHET_CONFIG = {
  */
 export async function collectEarningsHistory(
   workerId: string,
-  days: number = 30
+  days: number = 30,
+  databaseUrl?: string
 ): Promise<EarningsHistory[]> {
-  const db = getDatabase();
+  const db = getDatabase(databaseUrl);
   
   // Calculate date range
   const now = new Date();
@@ -244,7 +246,9 @@ function predictEarningsHeuristic(history: EarningsHistory[]): EarningsPredictio
   const recentDays = history.slice(-14);
   const trend = calculateTrend(recentDays);
   
-  // Determine trend direction
+  // Determine trend direction (currently unused, reserved for future analytics)
+  // @ts-ignore - Reserved for future trend analysis features
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const trendDirection: 'increasing' | 'stable' | 'decreasing' = 
     trend > 0.1 ? 'increasing' : trend < -0.1 ? 'decreasing' : 'stable';
 
@@ -356,12 +360,15 @@ function predictEarningsHeuristic(history: EarningsHistory[]): EarningsPredictio
  * 
  * @param workerId - Worker UUID
  * @param days - Number of days to predict (default: 7)
+ * @param days - Number of days to predict (default: 7)
+ * @param databaseUrl - Database connection string (required for Cloudflare Workers)
  * @param forceRefresh - Force recalculation (bypass cache)
  * @returns Earnings prediction with confidence and safe advance amount
  */
 export async function predictEarnings(
   workerId: string,
   days: number = 7,
+  databaseUrl?: string,
   forceRefresh: boolean = false
 ): Promise<EarningsPrediction> {
   // Check cache first (unless force refresh)
@@ -374,7 +381,7 @@ export async function predictEarnings(
   }
 
   // Collect historical data (30 days recommended)
-  const history = await collectEarningsHistory(workerId, 30);
+  const history = await collectEarningsHistory(workerId, 30, databaseUrl);
 
   // Calculate prediction (try Prophet, fallback to heuristic)
   let prediction: EarningsPrediction;
@@ -464,9 +471,9 @@ export async function predictBatchEarnings(
  * Update prediction after task completion
  * Call this after a task is completed to refresh the cache
  */
-export async function updatePredictionAfterTask(workerId: string): Promise<void> {
+export async function updatePredictionAfterTask(workerId: string, databaseUrl?: string): Promise<void> {
   clearPredictionCache(workerId);
-  await predictEarnings(workerId, 7, true);
+  await predictEarnings(workerId, 7, databaseUrl, true);
 }
 
 // ===================================

@@ -14,8 +14,9 @@
 const API_BASE_URL = process.env.API_BASE_URL || "http://localhost:8787";
 
 // Test data (using demo worker from seed data)
-const TEST_WORKER_ID = "11111111-1111-1111-1111-111111111111"; // Alice Johnson from seed data
+const TEST_WORKER_ID = "11111111-1111-1111-1111-111111111111"; // Will be updated from login response
 let testToken = null;
+let testWorkerId = null;
 
 /**
  * Helper function to make API requests
@@ -51,14 +52,16 @@ async function testLogin() {
     const { response, data } = await apiRequest("/api/v1/auth/login", {
       method: "POST",
       body: JSON.stringify({
-        email: "alice.johnson@example.com",
-        password: "password123",
+        email: "alice@example.com",
+        password: "demo123",
       }),
     });
 
     if (response.ok && data.success) {
-      testToken = data.data.token;
+      testToken = data.data.accessToken;
+      testWorkerId = data.data.user.id;
       console.log("✅ Login successful");
+      console.log(`   Worker ID: ${testWorkerId}`);
       console.log(`   Token: ${testToken.substring(0, 20)}...`);
       return true;
     } else {
@@ -81,7 +84,7 @@ async function testGetReputation() {
   try {
     const startTime = Date.now();
     const { response, data } = await apiRequest(
-      `/api/v1/workers/${TEST_WORKER_ID}/reputation`
+      `/api/v1/workers/${testWorkerId}/reputation`
     );
     const endTime = Date.now();
 
