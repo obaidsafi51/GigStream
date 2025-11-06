@@ -3,8 +3,8 @@
  * Verifies schema migration and basic CRUD operations
  */
 
-import { getDb } from "./src/db/client.js";
-import { workers, platforms, tasks } from "./src/db/schema.js";
+import { getDb } from "./database/client.js";
+import { workers, platforms, tasks } from "./database/schema.js";
 import { eq } from "drizzle-orm";
 
 const DATABASE_URL =

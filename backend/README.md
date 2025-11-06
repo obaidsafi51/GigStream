@@ -6,7 +6,28 @@
 - PostgreSQL 16+ (local) OR Neon.tech account (serverless)
 - Circle Developer account (https://console.circle.com)
 
-## 🚀 Quick Start
+## � Project Structure
+
+```
+backend/
+├── database/              # Database schema and configuration (Drizzle ORM)
+│   ├── schema.ts         # Complete Drizzle schema (8 tables, 7 enums, 39 indexes)
+│   ├── client.ts         # Database client factory (auto-detects Neon vs PostgreSQL)
+│   ├── triggers.sql      # PostgreSQL triggers for auto-stats
+│   ├── views.sql         # PostgreSQL views for analytics
+│   └── README.md         # Comprehensive database documentation
+├── src/
+│   ├── routes/           # API route handlers
+│   ├── services/         # Business logic layer
+│   ├── middleware/       # Hono middleware
+│   └── types/            # TypeScript types
+├── drizzle/              # Drizzle migrations
+└── test-*.mjs            # Test scripts
+```
+
+For detailed documentation, see `database/README.md`.
+
+## �🚀 Quick Start
 
 ### 1. Install Dependencies
 
@@ -114,25 +135,26 @@ npm run dev              # Start Wrangler dev server
 npm run deploy           # Deploy to Cloudflare Workers
 ```
 
-# Run triggers
+### Applying Triggers and Views (Optional)
 
-\i prisma/triggers.sql
+```bash
+psql $DATABASE_URL
+
+# Run triggers
+\i database/triggers.sql
 
 # Run views
-
-\i prisma/views.sql
+\i database/views.sql
 
 # Exit
-
 \q
-
-````
+```
 
 Alternatively, you can add these to a custom migration:
 
 ```bash
 npx prisma migrate dev --name add_triggers_and_views --create-only
-````
+```
 
 Then paste the contents of `triggers.sql` and `views.sql` into the generated migration file.
 
@@ -308,9 +330,13 @@ This is perfect for testing migrations without affecting production!
 - Run: `npm run db:generate`
 - Restart TypeScript server in VS Code
 
-### Triggers/Views not working
+### PostgreSQL Triggers Not Working
 
-- Apply manually: `psql $DATABASE_URL -f prisma/triggers.sql`
+**Issue**: Worker statistics not auto-updating
+
+**Solution**:
+
+- Apply manually: `psql $DATABASE_URL -f database/triggers.sql`
 - Check logs: `\dt` to list tables, `\df` to list functions
 
 ## 📚 Additional Resources

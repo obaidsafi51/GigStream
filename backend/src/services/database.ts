@@ -2,8 +2,8 @@
 // Handles Drizzle ORM client initialization and common database operations
 // Optimized for Cloudflare Workers with Neon HTTP driver
 
-import { getDb } from '../db/client.js';
-import * as schema from '../db/schema.js';
+import { getDb } from '../../database/client.js';
+import * as schema from '../../database/schema.js';
 import { eq, desc, lte, inArray, and, sql } from 'drizzle-orm';
 
 /**

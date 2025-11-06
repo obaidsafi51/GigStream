@@ -8,7 +8,7 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import { getDatabase, queries } from '../services/database.js';
 import { verifyTaskCompletion, TaskCompletionSchema } from '../services/verification.js';
 import { executeInstantPayment } from '../services/payment.js';
-import * as schema from '../db/schema.js';
+import * as schema from '../../database/schema.js';
 import { eq } from 'drizzle-orm';
 
 const webhooksRoutes = new Hono();

@@ -2,8 +2,8 @@
 // Provides platform performance metrics and analytics
 // Optimized for fast calculation with caching support
 
-import { getDb } from '../db/client.js';
-import * as schema from '../db/schema.js';
+import { getDb } from '../../database/client.js';
+import * as schema from '../../database/schema.js';
 import { eq, gte, and, sql } from 'drizzle-orm';
 
 /**
