@@ -15,7 +15,8 @@
     "test:db": "npx tsx test-drizzle-db.mjs",
     "test:auth": "npx tsx test-auth-simple.mjs",
     "test:risk": "npx tsx --env-file=.env test-risk-scoring.mjs",
-    "test:prediction": "npx tsx --env-file=.env test-prediction.mjs"
+    "test:prediction": "npx tsx --env-file=.env test-prediction.mjs",
+    "test:webhook": "npx tsx --env-file=.env test-webhook-handler.mjs"
   },
   "dependencies": {
     "@circle-fin/developer-controlled-wallets": "^9.2.0",

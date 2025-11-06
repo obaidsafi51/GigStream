@@ -4,7 +4,7 @@
 
 import { getDb } from '../../database/client.js';
 import * as schema from '../../database/schema.js';
-import { eq, desc, lte, inArray, and, sql } from 'drizzle-orm';
+import { eq, desc, lte, gte, inArray, and, sql } from 'drizzle-orm';
 
 /**
  * Get Drizzle database instance
@@ -118,7 +118,7 @@ export const queries = {
     const activeStreams = await db.query.streams.findMany({
       where: and(
         eq(schema.streams.status, 'active'),
-        lte(schema.streams.nextReleaseAt, new Date())
+        lte(schema.streams.nextReleaseAt, new Date().toISOString())
       ),
       orderBy: [schema.streams.nextReleaseAt],
     });
@@ -185,7 +185,7 @@ export const queries = {
       .where(
         and(
           eq(schema.tasks.workerId, workerId),
-          lte(last24h, schema.tasks.completedAt)
+          gte(schema.tasks.completedAt, last24h.toISOString())
         )
       );
 
@@ -218,7 +218,7 @@ export const queries = {
     const recentTasks = await db.query.tasks.findMany({
       where: and(
         eq(schema.tasks.workerId, workerId),
-        lte(last30Days, schema.tasks.createdAt)
+        gte(schema.tasks.createdAt, last30Days.toISOString())
       ),
       columns: {
         paymentAmountUsdc: true,
@@ -249,7 +249,7 @@ export const queries = {
         lat: task.verificationData.gpsCoordinates.lat,
         lon: task.verificationData.gpsCoordinates.lon,
       } : undefined,
-      completedAt: task.completedAt || new Date(),
+      completedAt: task.completedAt ? new Date(task.completedAt) : new Date(),
     }));
 
     return {
