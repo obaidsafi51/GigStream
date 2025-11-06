@@ -12,7 +12,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { executeInstantPayment } from '../services/payment';
 import { getDatabase } from '../services/database.js';
-import * as schema from '../db/schema.js';
+import * as schema from '../../database/schema.js';
 import { eq, or, inArray, sql } from 'drizzle-orm';
 import { count } from 'drizzle-orm';
 

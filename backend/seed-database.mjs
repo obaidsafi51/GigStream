@@ -2,8 +2,8 @@
 // Populates database with realistic demo data for testing and development
 // Converted from Prisma to Drizzle ORM
 
-import { getDb } from "./src/db/client.js";
-import * as schema from "./src/db/schema.js";
+import { getDb } from "./database/client.js";
+import * as schema from "./database/schema.js";
 import { createHash } from "crypto";
 import bcrypt from "bcryptjs";
 

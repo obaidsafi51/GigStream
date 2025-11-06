@@ -1,6 +1,6 @@
 // Quick verification of seeded data
-import { getDb } from "./src/db/client.js";
-import * as schema from "./src/db/schema.js";
+import { getDb } from "./database/client.js";
+import * as schema from "./database/schema.js";
 import { eq } from "drizzle-orm";
 
 const DATABASE_URL =

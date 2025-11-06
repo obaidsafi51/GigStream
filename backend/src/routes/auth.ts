@@ -7,7 +7,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { validateRequest } from '../middleware/validation';
 import { getDatabase } from '../services/database.js';
-import * as schema from '../db/schema.js';
+import * as schema from '../../database/schema.js';
 import { eq } from 'drizzle-orm';
 import {
   hashPassword,

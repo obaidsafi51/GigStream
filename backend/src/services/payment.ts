@@ -19,11 +19,11 @@
  */
 
 import { getDatabase } from './database.js';
-import { getDb } from '../db/client.js';
+import { getDb } from '../../database/client.js';
 import { executeTransfer, getTransactionStatus } from './circle.js';
 import * as crypto from 'crypto';
 import { eq, and, desc } from 'drizzle-orm';
-import * as schema from '../db/schema.js';
+import * as schema from '../../database/schema.js';
 
 /**
  * Transaction result type
