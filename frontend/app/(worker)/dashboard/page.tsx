@@ -39,6 +39,40 @@ export default function DashboardPage() {
         setLoading(true);
         setError(null);
 
+        // Use mock data for demo mode (quick-login)
+        const isQuickLogin = user.id === 'demo-worker-1' || user.id === 'demo-platform-1';
+        
+        if (isQuickLogin) {
+          // Mock dashboard data
+          setBalance(245.75);
+          setTodayEarnings(85.00);
+          setReputation({
+            score: 85, // 850/1000 = 85%
+            level: "Experienced",
+            tasksCompleted: 47,
+          });
+          setTransactions([
+            {
+              id: 'tx-1',
+              amount: 35.00,
+              type: 'task_payment',
+              status: 'completed',
+              date: new Date().toISOString(),
+              taskTitle: 'Food Delivery',
+            },
+            {
+              id: 'tx-2',
+              amount: 50.00,
+              type: 'task_payment',
+              status: 'completed',
+              date: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+              taskTitle: 'Data Entry',
+            },
+          ]);
+          setLoading(false);
+          return;
+        }
+
         // Fetch data in parallel for better performance
         const [reputationRes, tasksRes] = await Promise.allSettled([
           apiClient.getWorkerReputation(user.id),

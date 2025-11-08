@@ -32,6 +32,50 @@ export default function TasksPage() {
         setLoading(true);
         setError(null);
 
+        // Use mock data for demo mode (quick-login)
+        const isQuickLogin = user.id === 'demo-worker-1' || user.id === 'demo-platform-1';
+        
+        if (isQuickLogin) {
+          // Mock tasks data
+          const mockTasks = [
+            {
+              id: 'task-1',
+              workerId: user.id,
+              title: 'Food Delivery - Downtown',
+              description: 'Deliver 3 meals to customers in the downtown area',
+              amount: 35.00,
+              paymentAmountUsdc: '35.00',
+              status: 'pending',
+              type: 'fixed',
+            },
+            {
+              id: 'task-2',
+              workerId: user.id,
+              title: 'Data Entry Task',
+              description: 'Enter 50 customer records into the system',
+              amount: 25.00,
+              paymentAmountUsdc: '25.00',
+              status: 'in_progress',
+              type: 'fixed',
+            },
+            {
+              id: 'task-3',
+              workerId: user.id,
+              title: 'Content Moderation',
+              description: 'Review and moderate 100 user-submitted images',
+              amount: 45.00,
+              paymentAmountUsdc: '45.00',
+              status: 'pending',
+              type: 'fixed',
+            },
+          ];
+          
+          setTasks(mockTasks);
+          setError(null);
+          setLoading(false);
+          return;
+        }
+
         const response = await apiClient.getDemoTasks() as any;
         
         if (response.success) {
@@ -74,6 +118,24 @@ export default function TasksPage() {
 
     try {
       setCompletingTaskId(taskId);
+
+      // Mock response for quick-login demo mode
+      const isQuickLogin = user.id === 'demo-worker-1' || user.id === 'demo-platform-1';
+      
+      if (isQuickLogin) {
+        // Simulate API delay
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        toast({
+          title: "Task Completed! (Demo)",
+          description: `Payment of $${amount.toFixed(2)} would be processed in production`,
+        });
+
+        // Remove completed task from list
+        setTasks(tasks.filter(t => t.id !== taskId));
+        setCompletingTaskId(null);
+        return;
+      }
 
       const response = await apiClient.completeTaskDemo(
         user.id,

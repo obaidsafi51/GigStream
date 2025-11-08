@@ -5,6 +5,7 @@
 import { getDb } from '../../database/client.js';
 import * as schema from '../../database/schema.js';
 import { eq, desc, lte, gte, inArray, and, sql } from 'drizzle-orm';
+import { config } from 'dotenv';
 
 /**
  * Get Drizzle database instance
@@ -15,18 +16,37 @@ import { eq, desc, lte, gte, inArray, and, sql } from 'drizzle-orm';
  *       For Cloudflare Workers, it should be passed from c.env
  */
 export function getDatabase(databaseUrl?: string) {
+  // In a Node.js environment, attempt to load variables from a .env file
+  // if DATABASE_URL is not already present. This is safe to call and won't
+  // override existing environment variables. It helps local scripts run
+  // without needing the --env-file flag.
+  if (typeof process !== 'undefined' && !process.env.DATABASE_URL) {
+    console.log('DATABASE_URL not found in process.env, attempting to load from .env file...');
+    config();
+  }
+
   // Try multiple sources in order:
   // 1. Passed parameter (from Cloudflare Workers context)
-  // 2. process.env (for Node.js scripts)
-  // 3. globalThis.process?.env (for some environments)
+  // 2. process.env (for Node.js scripts, now loaded via dotenv)
+  // 3. globalThis (for some edge case environments)
   const dbUrl = databaseUrl || 
-                process.env.DATABASE_URL || 
-                (typeof process !== 'undefined' && process.env?.DATABASE_URL) ||
+                process.env.DATABASE_URL ||
                 (globalThis as any).DATABASE_URL;
   
   if (!dbUrl) {
-    throw new Error('DATABASE_URL is not defined');
+    console.error('CRITICAL: DATABASE_URL is not defined after checking all sources.');
+    throw new Error('DATABASE_URL is not defined. Ensure it is set in your environment, a .env file, or passed correctly in a worker context.');
   }
+
+  try {
+    // Log a sanitized version of the URL for debugging
+    const url = new URL(dbUrl);
+    console.log(`Attempting to connect to database host: ${url.hostname}`);
+  } catch (e) {
+    console.error('CRITICAL: The provided DATABASE_URL is not a valid URL.');
+    throw new Error('The DATABASE_URL is malformed. Please check the format.');
+  }
+
   return getDb(dbUrl);
 }
 
@@ -129,7 +149,7 @@ export const queries = {
     const activeStreams = await db.query.streams.findMany({
       where: and(
         eq(schema.streams.status, 'active'),
-        lte(schema.streams.nextReleaseAt, new Date().toISOString())
+        lte(schema.streams.nextReleaseAt, new Date())
       ),
       orderBy: [schema.streams.nextReleaseAt],
     });
@@ -196,7 +216,7 @@ export const queries = {
       .where(
         and(
           eq(schema.tasks.workerId, workerId),
-          gte(schema.tasks.completedAt, last24h.toISOString())
+          gte(schema.tasks.completedAt, last24h)
         )
       );
 
@@ -229,13 +249,11 @@ export const queries = {
     const recentTasks = await db.query.tasks.findMany({
       where: and(
         eq(schema.tasks.workerId, workerId),
-        gte(schema.tasks.createdAt, last30Days.toISOString())
+        gte(schema.tasks.createdAt, last30Days)
       ),
       columns: {
         paymentAmountUsdc: true,
         completedAt: true,
-        estimatedDurationMinutes: true,
-        actualDurationMinutes: true,
         verificationData: true,
       },
       orderBy: [desc(schema.tasks.completedAt)],
@@ -243,9 +261,9 @@ export const queries = {
     });
 
     // Calculate account age
-    const accountAgeDays = Math.floor(
-      (Date.now() - worker.createdAt.getTime()) / (24 * 60 * 60 * 1000)
-    );
+    const accountAgeDays = worker.createdAt 
+      ? Math.floor((Date.now() - worker.createdAt.getTime()) / (24 * 60 * 60 * 1000))
+      : 0;
 
     // Calculate completion rate
     const totalTasks = worker.totalTasksCompleted || 0;
@@ -253,15 +271,18 @@ export const queries = {
     const completionRate = totalTasks > 0 ? totalTasks / (totalTasks + disputes) : 1;
 
     // Parse recent tasks for fraud detection
-    const recentTasksFormatted = recentTasks.map(task => ({
-      amount: parseFloat(task.paymentAmountUsdc),
-      duration: task.actualDurationMinutes || task.estimatedDurationMinutes || 0,
-      gps: task.verificationData?.gpsCoordinates ? {
-        lat: task.verificationData.gpsCoordinates.lat,
-        lon: task.verificationData.gpsCoordinates.lon,
-      } : undefined,
-      completedAt: task.completedAt ? new Date(task.completedAt) : new Date(),
-    }));
+    const recentTasksFormatted = recentTasks.map(task => {
+      const verificationData = task.verificationData as any;
+      return {
+        amount: parseFloat(task.paymentAmountUsdc),
+        duration: 0, // Duration fields removed from schema
+        gps: verificationData?.gpsCoordinates ? {
+          lat: verificationData.gpsCoordinates.lat,
+          lon: verificationData.gpsCoordinates.lon,
+        } : undefined,
+        completedAt: task.completedAt ? new Date(task.completedAt) : new Date(),
+      };
+    });
 
     return {
       reputationScore: worker.reputationScore || 100,
