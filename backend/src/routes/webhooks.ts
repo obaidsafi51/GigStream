@@ -133,7 +133,7 @@ webhooksRoutes.post('/task-completed', async (c) => {
     }
     
     // 2. Verify platform exists and get webhook secret
-    const db = getDatabase(c.env?.DATABASE_URL);
+    const db = getDatabase((c.env as any).DATABASE_URL);
     const platform = await db.query.platforms.findFirst({
       where: eq(schema.platforms.apiKeyHash, hashApiKey(apiKey)),
       columns: {
@@ -335,7 +335,7 @@ async function processTaskWithRetry(
         title: task.metadata?.title || 'Task completion',
         description: task.metadata?.description,
         paymentAmountUsdc: task.amount.toString(),
-        status: 'pending', // Pending manual review
+        status: 'created', // Pending manual review
         verificationData: task.completionProof,
         verificationStatus: 'flagged',
         metadata: {
@@ -355,19 +355,19 @@ async function processTaskWithRetry(
     
     // 5. Execute payment (if approved)
     try {
-      const payment = await executeInstantPayment(
-        task.externalTaskId,
-        task.workerId,
-        task.amount,
-        db
-      );
+      const payment = await executeInstantPayment({
+        taskId: task.externalTaskId,
+        workerId: task.workerId,
+        amount: task.amount,
+        platformId: platform.id,
+      });
       
       const totalProcessingTime = Date.now() - processingStartTime;
       
       return {
         success: true,
-        taskId: payment.task.id,
-        transactionHash: payment.transaction.txHash,
+        taskId: payment.taskId,
+        transactionHash: payment.txHash,
         amount: task.amount,
         verification: {
           verdict: verification.verdict,
@@ -578,7 +578,7 @@ webhooksRoutes.get('/dead-letter-queue', async (c) => {
       }, 401);
     }
     
-    const db = getDatabase(c.env?.DATABASE_URL);
+    const db = getDatabase((c.env as any).DATABASE_URL);
     
     // Verify platform
     const platform = await db.query.platforms.findFirst({
@@ -665,7 +665,7 @@ webhooksRoutes.post('/dead-letter-queue/:id/retry', async (c) => {
       }, 401);
     }
     
-    const db = getDatabase(c.env?.DATABASE_URL);
+    const db = getDatabase((c.env as any).DATABASE_URL);
     
     // Verify platform
     const platform = await db.query.platforms.findFirst({
