@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GigStream - Clear Auth Data</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #0a0a0a;
+            color: #fff;
+        }
+        .card {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+        h1 { color: #3b82f6; margin-bottom: 8px; }
+        h2 { color: #3b82f6; margin-bottom: 12px; font-size: 18px; }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            margin-bottom: 12px;
+        }
+        button:hover { background: #2563eb; }
+        .success { background: #10b981; }
+        .success:hover { background: #059669; }
+        .info { background: #333; color: #fff; padding: 12px; border-radius: 6px; margin: 12px 0; }
+        .warning { background: #f59e0b; color: #000; }
+        .warning:hover { background: #d97706; }
+        code { background: #333; padding: 2px 6px; border-radius: 4px; font-size: 14px; }
+        .status { padding: 8px; margin: 8px 0; border-radius: 4px; }
+        .status.error { background: #dc2626; }
+        .status.success { background: #10b981; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>🔧 GigStream Auth Fix</h1>
+        <p>This tool will clear all authentication data and fix the platform redirect issue.</p>
+    </div>
+
+    <div class="card">
+        <h2>Current Status</h2>
+        <div id="currentStatus"></div>
+    </div>
+
+    <div class="card">
+        <h2>Step 1: Clear All Auth Data</h2>
+        <button onclick="clearAllAuthData()" class="warning">🗑️ Clear localStorage & Cookies</button>
+        <div class="info">
+            This will remove:
+            <ul>
+                <li>All localStorage data (including auth-storage)</li>
+                <li>All cookies (including auth_token)</li>
+                <li>Any cached user data</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Step 2: Test Login</h2>
+        <button onclick="testLogin()" class="success">✅ Test Worker Login</button>
+        <div class="info">
+            Test credentials:
+            <br><code>Email: alice@example.com</code>
+            <br><code>Password: demo123</code>
+        </div>
+        <div id="loginStatus"></div>
+    </div>
+
+    <div class="card">
+        <h2>Step 3: Verify Redirect</h2>
+        <button onclick="goToLogin()">🚀 Go to Login Page</button>
+        <div class="info">
+            After clicking, login and verify:
+            <br>✅ Should redirect to <code>/dashboard</code>
+            <br>❌ Should NOT redirect to <code>/platform/dashboard</code>
+        </div>
+    </div>
+
+    <div id="results" class="card" style="display: none;">
+        <h2>Results</h2>
+        <div id="resultsContent"></div>
+    </div>
+
+    <script>
+        function checkCurrentStatus() {
+            const authStorage = localStorage.getItem('auth-storage');
+            const cookies = document.cookie;
+            const statusDiv = document.getElementById('currentStatus');
+            
+            let html = '<div class="status">';
+            
+            if (authStorage) {
+                const auth = JSON.parse(authStorage);
+                html += `<strong>LocalStorage Found:</strong><br>`;
+                html += `User: ${auth.state?.user?.email || 'None'}<br>`;
+                html += `Role: ${auth.state?.user?.role || 'None'}<br>`;
+                html += `Type: ${auth.state?.user?.type || 'None'}<br>`;
+                html += `Authenticated: ${auth.state?.isAuthenticated || false}<br>`;
+            } else {
+                html += '<strong>LocalStorage:</strong> Clean ✅<br>';
+            }
+            
+            if (cookies.includes('auth_token')) {
+                html += '<br><strong>Cookie Found:</strong> auth_token exists ⚠️';
+            } else {
+                html += '<br><strong>Cookies:</strong> Clean ✅';
+            }
+            
+            html += '</div>';
+            statusDiv.innerHTML = html;
+        }
+
+        function clearAllAuthData() {
+            // Clear localStorage
+            localStorage.clear();
+            
+            // Clear all cookies
+            document.cookie.split(";").forEach(function(c) { 
+                document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+            });
+            
+            // Clear sessionStorage too
+            sessionStorage.clear();
+            
+            const resultsDiv = document.getElementById('results');
+            const resultsContent = document.getElementById('resultsContent');
+            resultsDiv.style.display = 'block';
+            resultsContent.innerHTML = `
+                <div class="status success">
+                    ✅ All authentication data cleared!<br><br>
+                    <strong>Next steps:</strong><br>
+                    1. Reload this page (Ctrl+Shift+R)<br>
+                    2. Go to login page<br>
+                    3. Login with worker account<br>
+                    4. Verify redirect to /dashboard
+                </div>
+            `;
+            
+            checkCurrentStatus();
+        }
+
+        async function testLogin() {
+            const statusDiv = document.getElementById('loginStatus');
+            statusDiv.innerHTML = '<div class="status">Testing login...</div>';
+            
+            try {
+                const response = await fetch('http://localhost:8787/api/v1/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: 'alice@example.com',
+                        password: 'demo123'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    statusDiv.innerHTML = `
+                        <div class="status success">
+                            ✅ Login API works!<br><br>
+                            <strong>User Type:</strong> ${data.data.user.type}<br>
+                            <strong>Expected:</strong> worker<br>
+                            <strong>Match:</strong> ${data.data.user.type === 'worker' ? '✅' : '❌'}
+                        </div>
+                    `;
+                } else {
+                    statusDiv.innerHTML = `
+                        <div class="status error">
+                            ❌ Login failed: ${data.error?.message || 'Unknown error'}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `
+                    <div class="status error">
+                        ❌ Error: ${error.message}<br>
+                        Make sure backend is running on localhost:8787
+                    </div>
+                `;
+            }
+        }
+
+        function goToLogin() {
+            window.location.href = '/login';
+        }
+
+        // Check status on load
+        checkCurrentStatus();
+    </script>
+</body>
+</html>

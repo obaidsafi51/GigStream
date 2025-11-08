@@ -10,9 +10,20 @@ import { eq, desc, lte, gte, inArray, and, sql } from 'drizzle-orm';
  * Get Drizzle database instance
  * Creates a new connection per request (Cloudflare Workers pattern)
  * Returns the appropriate database type (Neon or PostgreSQL)
+ * 
+ * Note: For Node.js scripts, DATABASE_URL comes from process.env
+ *       For Cloudflare Workers, it should be passed from c.env
  */
 export function getDatabase(databaseUrl?: string) {
-  const dbUrl = databaseUrl || process.env.DATABASE_URL;
+  // Try multiple sources in order:
+  // 1. Passed parameter (from Cloudflare Workers context)
+  // 2. process.env (for Node.js scripts)
+  // 3. globalThis.process?.env (for some environments)
+  const dbUrl = databaseUrl || 
+                process.env.DATABASE_URL || 
+                (typeof process !== 'undefined' && process.env?.DATABASE_URL) ||
+                (globalThis as any).DATABASE_URL;
+  
   if (!dbUrl) {
     throw new Error('DATABASE_URL is not defined');
   }

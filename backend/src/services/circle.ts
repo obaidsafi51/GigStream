@@ -9,13 +9,13 @@
 
 import { 
   initiateDeveloperControlledWalletsClient,
-  type CreateWalletsInput,
-  type CreateWalletSetInput,
 } from '@circle-fin/developer-controlled-wallets';
 import crypto from 'crypto';
 
 /**
  * Circle SDK client instance (singleton)
+ * Note: Circle SDK only works in Node.js environment
+ * For Cloudflare Workers, we use a separate wallet service
  */
 let circleClient: ReturnType<typeof initiateDeveloperControlledWalletsClient> | null = null;
 
@@ -36,42 +36,23 @@ function getCircleClient() {
       throw new Error('CIRCLE_ENTITY_SECRET not configured in environment');
     }
 
-    circleClient = initiateDeveloperControlledWalletsClient({
-      apiKey,
-      entitySecret,
-    });
+    try {
+      circleClient = initiateDeveloperControlledWalletsClient({
+        apiKey,
+        entitySecret,
+      });
 
-    console.log('✓ Circle SDK initialized');
+      console.log('✓ Circle SDK initialized');
+    } catch (error: any) {
+      console.error('✗ Failed to initialize Circle SDK:', error.message);
+      throw new Error(`Circle SDK initialization failed: ${error.message}`);
+    }
   }
 
   return circleClient;
 }
 
-/**
- * Create wallet set (required before creating wallets)
- * Wallet sets group related wallets together
- */
-async function createWalletSet(name: string): Promise<string> {
-  const client = getCircleClient();
 
-  try {
-    const request: CreateWalletSetInput = {
-      name: name,
-    };
-
-    const response = await client.createWalletSet(request);
-
-    if (!response.data?.walletSet?.id) {
-      throw new Error('Wallet set creation failed - no ID returned');
-    }
-
-    console.log(`✓ Wallet set created: ${response.data.walletSet.id}`);
-    return response.data.walletSet.id;
-  } catch (error: any) {
-    console.error('✗ Failed to create wallet set:', error.message);
-    throw new Error(`Wallet set creation failed: ${error.message}`);
-  }
-}
 
 /**
  * Create Circle wallet for a user (developer-controlled)
@@ -84,59 +65,60 @@ export async function createWallet(userId: string): Promise<{
   walletId: string;
   address: string;
 }> {
-  const client = getCircleClient();
+  // Use standalone wallet service (Node.js) for Circle SDK operations
+  // This runs alongside Cloudflare Workers
+  const walletServiceUrl = process.env.WALLET_SERVICE_URL || 'http://localhost:3001';
+  const walletServiceSecret = process.env.WALLET_SERVICE_SECRET || 'dev-secret-change-in-production';
 
   try {
-    // Step 1: Create wallet set for this user
-    const walletSetName = `gigstream-user-${userId}-${Date.now()}`;
-    const walletSetId = await createWalletSet(walletSetName);
+    console.log('🔧 Calling wallet service for Circle SDK operations');
+    console.log(`   Service: ${walletServiceUrl}`);
+    console.log(`   Secret: ${walletServiceSecret.substring(0, 15)}...`);
+    console.log(`   User ID: ${userId}`);
 
-    // Step 2: Create wallet in the wallet set
-    // Arc is EVM-compatible, so we use EVM-TESTNET wallet type
-    // Arc Testnet Chain ID: 5042002
-    const request: CreateWalletsInput = {
-      accountType: 'EOA', // Externally Owned Account
-      blockchains: ['EVM-TESTNET'], // Arc is EVM-compatible
-      count: 1,
-      walletSetId: walletSetId,
-    };
+    const response = await fetch(`${walletServiceUrl}/create-wallet`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Secret': walletServiceSecret,
+      },
+      body: JSON.stringify({
+        userId: userId,
+      }),
+    });
 
-    const response = await client.createWallets(request);
-
-    if (!response.data?.wallets || response.data.wallets.length === 0) {
-      throw new Error('Wallet creation failed - no wallets returned');
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Wallet service error: ${response.status} - ${error}`);
     }
 
-    const wallet = response.data.wallets[0];
+    const data = await response.json() as any;
 
-    if (!wallet.id) {
-      throw new Error('Wallet creation failed - no wallet ID returned');
+    if (!data.success || !data.data) {
+      throw new Error('Wallet service returned invalid response');
     }
 
-    // Address may be pending generation, poll if needed
-    let address = wallet.address || '';
-    if (!address) {
-      console.log('⏳ Wallet address generation pending, waiting...');
-      // In production, implement polling or webhook listener
-      // For MVP, we'll return empty address and let it be populated later
-      address = 'pending';
-    }
+    const wallet = data.data;
 
-    console.log(`✓ Wallet created: ${wallet.id}`);
-    console.log(`  Address: ${address}`);
-    console.log(`  State: ${wallet.state}`);
+    console.log(`✓ Wallet created via service: ${wallet.walletId}`);
+    console.log(`  Address: ${wallet.address}`);
+    console.log(`  Compatible with Arc blockchain: ${wallet.arcCompatible}`);
 
     return {
-      walletId: wallet.id,
-      address: address,
+      walletId: wallet.walletId,
+      address: wallet.address,
     };
   } catch (error: any) {
-    console.error('✗ Failed to create wallet:', error.message);
-    if (error.response) {
-      console.error('  Status:', error.response.status);
-      console.error('  Data:', JSON.stringify(error.response.data, null, 2));
+    console.error('✗ Wallet service call failed:', error.message);
+    
+    // Check if service is unreachable
+    if (error.message.includes('fetch failed') || error.message.includes('ECONNREFUSED')) {
+      console.error('⚠ Wallet service appears to be offline');
+      console.error('  Start it with: node backend/wallet-service.mjs');
     }
-    throw new Error(`Wallet creation failed: ${error.message}`);
+    
+    // Re-throw to trigger fallback in auth route
+    throw error;
   }
 }
 

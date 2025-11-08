@@ -440,6 +440,92 @@ export const auditLogs = pgTable(
 );
 
 // ===================================
+// RELATIONS
+// ===================================
+
+import { relations } from 'drizzle-orm';
+
+export const workersRelations = relations(workers, ({ many }) => ({
+  tasks: many(tasks),
+  transactions: many(transactions),
+  reputationEvents: many(reputationEvents),
+  loans: many(loans),
+}));
+
+export const platformsRelations = relations(platforms, ({ many }) => ({
+  tasks: many(tasks),
+  streams: many(streams),
+  transactions: many(transactions),
+}));
+
+export const tasksRelations = relations(tasks, ({ one, many }) => ({
+  worker: one(workers, {
+    fields: [tasks.workerId],
+    references: [workers.id],
+  }),
+  platform: one(platforms, {
+    fields: [tasks.platformId],
+    references: [platforms.id],
+  }),
+  streams: many(streams),
+  transactions: many(transactions),
+  reputationEvents: many(reputationEvents),
+}));
+
+export const streamsRelations = relations(streams, ({ one, many }) => ({
+  worker: one(workers, {
+    fields: [streams.workerId],
+    references: [workers.id],
+  }),
+  platform: one(platforms, {
+    fields: [streams.platformId],
+    references: [platforms.id],
+  }),
+  task: one(tasks, {
+    fields: [streams.taskId],
+    references: [tasks.id],
+  }),
+  transactions: many(transactions),
+}));
+
+export const transactionsRelations = relations(transactions, ({ one }) => ({
+  worker: one(workers, {
+    fields: [transactions.workerId],
+    references: [workers.id],
+  }),
+  platform: one(platforms, {
+    fields: [transactions.platformId],
+    references: [platforms.id],
+  }),
+  task: one(tasks, {
+    fields: [transactions.taskId],
+    references: [tasks.id],
+  }),
+  stream: one(streams, {
+    fields: [transactions.streamId],
+    references: [streams.id],
+  }),
+}));
+
+export const reputationEventsRelations = relations(reputationEvents, ({ one }) => ({
+  worker: one(workers, {
+    fields: [reputationEvents.workerId],
+    references: [workers.id],
+  }),
+  task: one(tasks, {
+    fields: [reputationEvents.taskId],
+    references: [tasks.id],
+  }),
+}));
+
+export const loansRelations = relations(loans, ({ one }) => ({
+  worker: one(workers, {
+    fields: [loans.workerId],
+    references: [workers.id],
+  }),
+}));
+
+// ===================================
 // TYPE EXPORTS
 // ===================================
 
