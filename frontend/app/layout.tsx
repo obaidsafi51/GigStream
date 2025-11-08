@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { Toaster } from "@/components/ui/toast";
-import { Header } from "@/components/shared/header";
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,7 +17,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "GigStream - Instant Payments for Gig Workers",
-  description: "Blockchain-powered instant payment platform for gig workers",
+  description: "AI-powered real-time USDC payment streaming platform for gig workers on Arc blockchain",
+  keywords: ["gig economy", "blockchain", "USDC", "Circle", "Arc", "instant payments"],
 };
 
 export default function RootLayout({
@@ -30,11 +32,13 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning
       >
-        <Header />
-        <main className="min-h-screen">
-          {children}
-        </main>
-        <Toaster />
+        <TooltipProvider>
+          <main className="min-h-screen">
+            {children}
+          </main>
+          <Toaster />
+          <Sonner />
+        </TooltipProvider>
       </body>
     </html>
   );

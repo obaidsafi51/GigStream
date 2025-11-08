@@ -60,14 +60,130 @@ workersRoutes.get('/:workerId/balance', authenticateJWT, async (c) => {
  * Get paginated transaction history
  */
 workersRoutes.get('/:workerId/earnings', authenticateJWT, async (c) => {
-  // TODO: Implement earnings history (use page and limit params when implemented)
-  return c.json({
-    success: false,
-    error: {
-      code: 'NOT_IMPLEMENTED',
-      message: 'Earnings history to be implemented',
-    },
-  }, 501);
+  const workerId = c.req.param('workerId');
+  const page = parseInt(c.req.query('page') || '1');
+  const limit = parseInt(c.req.query('limit') || '50');
+  const type = c.req.query('type'); // Optional filter: payout, advance, refund, etc.
+  
+  try {
+    const { getDatabase } = await import('../services/database.js');
+    const schema = await import('../../database/schema.js');
+    const { eq, and, desc, sql } = await import('drizzle-orm');
+    
+    const db = getDatabase(c.env?.DATABASE_URL);
+    
+    // Verify worker exists
+    const worker = await db.query.workers.findFirst({
+      where: eq(schema.workers.id, workerId),
+    });
+    
+    if (!worker) {
+      return c.json({
+        success: false,
+        error: {
+          code: 'WORKER_NOT_FOUND',
+          message: 'Worker not found',
+        },
+      }, 404);
+    }
+    
+    // Build query with optional type filter
+    const whereConditions = [eq(schema.transactions.workerId, workerId)];
+    if (type) {
+      whereConditions.push(eq(schema.transactions.type, type as any));
+    }
+    
+    // Get total count
+    const countResult = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(schema.transactions)
+      .where(and(...whereConditions));
+    const totalCount = countResult[0]?.count || 0;
+    
+    // Get paginated transactions with related data
+    const offset = (page - 1) * limit;
+    const transactions = await db.query.transactions.findMany({
+      where: and(...whereConditions),
+      orderBy: [desc(schema.transactions.createdAt)],
+      limit,
+      offset,
+      with: {
+        task: {
+          columns: {
+            id: true,
+            title: true,
+            description: true,
+          },
+        },
+      },
+    });
+    
+    // Format transactions
+    const formattedTransactions = transactions.map((tx) => ({
+      id: tx.id,
+      type: tx.type,
+      status: tx.status,
+      amount: parseFloat(tx.amountUsdc),
+      fee: parseFloat(tx.feeUsdc || '0'),
+      txHash: tx.txHash,
+      fromWallet: tx.fromWallet,
+      toWallet: tx.toWallet,
+      taskId: tx.taskId,
+      taskTitle: tx.task?.title || null,
+      taskDescription: tx.task?.description || null,
+      streamId: tx.streamId,
+      loanId: tx.loanId,
+      blockNumber: tx.blockNumber,
+      confirmations: tx.confirmations,
+      errorMessage: tx.errorMessage,
+      createdAt: tx.createdAt,
+      confirmedAt: tx.confirmedAt,
+      metadata: tx.metadata,
+    }));
+    
+    // Calculate totals
+    const totalEarnings = formattedTransactions
+      .filter(tx => ['payout', 'refund'].includes(tx.type) && tx.amount > 0)
+      .reduce((sum, tx) => sum + tx.amount, 0);
+    
+    const totalAdvances = formattedTransactions
+      .filter(tx => tx.type === 'advance')
+      .reduce((sum, tx) => sum + tx.amount, 0);
+    
+    const totalRepayments = formattedTransactions
+      .filter(tx => tx.type === 'repayment')
+      .reduce((sum, tx) => sum + tx.amount, 0);
+    
+    return c.json({
+      success: true,
+      data: {
+        transactions: formattedTransactions,
+        pagination: {
+          page,
+          limit,
+          total: totalCount,
+          totalPages: Math.ceil(totalCount / limit),
+          hasMore: page * limit < totalCount,
+        },
+        summary: {
+          totalEarnings: Math.round(totalEarnings * 100) / 100,
+          totalAdvances: Math.round(totalAdvances * 100) / 100,
+          totalRepayments: Math.round(totalRepayments * 100) / 100,
+          netEarnings: Math.round((totalEarnings - totalRepayments) * 100) / 100,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching earnings history:', error);
+    return c.json({
+      success: false,
+      error: {
+        code: 'FETCH_EARNINGS_FAILED',
+        message: 'Failed to fetch earnings history',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      },
+    }, 500);
+  }
 });
 
 /**

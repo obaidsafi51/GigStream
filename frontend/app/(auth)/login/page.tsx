@@ -1,159 +1,124 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  Button,
-  Input,
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-  CardFooter,
-  toast,
-} from "@/components/ui";
-import { loginSchema, type LoginInput } from "@/lib/validations/auth";
-import { useAuth } from "@/hooks/useAuth";
+import { useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Zap } from 'lucide-react';
+import { apiClient } from '@/lib/api-client';
+import { useAuthStore } from '@/stores/auth-store';
+import { toast } from 'sonner';
 
 export default function LoginPage() {
-  const router = useRouter();
-  const { login, isLoading: authLoading } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
+  const { login } = useAuthStore();
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    setError,
-  } = useForm<LoginInput>({
-    resolver: zodResolver(loginSchema),
-  });
-
-  const onSubmit = async (data: LoginInput) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setIsLoading(true);
 
     try {
-      const result = await login(data.email, data.password);
-
-      if (result.success && result.user) {
-        toast.success("Login successful!", {
-          description: `Welcome back, ${result.user.name}!`,
-        });
-
-        // Redirect based on role
-        const redirectPath =
-          result.user.role === "worker"
-            ? "/dashboard"
-            : "/platform/dashboard";
-
-        router.push(redirectPath);
+      const response = await apiClient.login(email, password);
+      
+      if (response.success) {
+        // Extract user data and type from backend response
+        const userData = response.data.user;
+        const userType = userData.type || userData.role || 'worker';
+        
+        // CRITICAL: Backend returns 'type: worker' - always use worker dashboard
+        const user = {
+          ...userData,
+          role: 'worker', // Force worker role since backend only handles workers
+          type: userType,
+        };
+        
+        const token = (response.data as any).accessToken || response.data.token;
+        
+        // Store in Zustand + localStorage
+        login(user, token);
+        
+        // IMPORTANT: Also set cookie for middleware
+        document.cookie = `auth_token=${token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
+        
+        toast.success('Login successful!');
+        
+        console.log('Login successful - redirecting to worker dashboard');
+        console.log('User type:', userType, 'User role:', user.role);
+        
+        // Small delay to ensure cookie is set
+        setTimeout(() => {
+          // ALWAYS redirect to worker dashboard since backend only supports worker login
+          router.push('/dashboard');
+        }, 100);
       } else {
-        // Handle login errors
-        if (result.errors) {
-          Object.entries(result.errors).forEach(([field, messages]) => {
-            if (Array.isArray(messages) && messages.length > 0) {
-              setError(field as keyof LoginInput, {
-                message: messages[0],
-              });
-            }
-          });
-        } else {
-          toast.error("Login failed", {
-            description: result.message || "Invalid email or password",
-          });
-        }
+        toast.error('Login failed', {
+          description: 'Invalid response from server',
+        });
       }
     } catch (error) {
-      toast.error("Login failed", {
-        description: "An unexpected error occurred. Please try again.",
+      const errorMessage = error instanceof Error ? error.message : 'Please check your credentials';
+      toast.error('Login failed', {
+        description: errorMessage,
       });
-      console.error("Login error:", error);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-12">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-muted/20 to-background p-4">
       <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">
-            Welcome back
-          </CardTitle>
-          <CardDescription className="text-center">
-            Sign in to your GigStream account
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <Input
-              label="Email"
-              type="email"
-              placeholder="you@example.com"
-              error={!!errors.email}
-              helperText={errors.email?.message}
-              disabled={isLoading}
-              {...register("email")}
-            />
-
-            <Input
-              label="Password"
-              type="password"
-              placeholder="••••••••"
-              error={!!errors.password}
-              helperText={errors.password?.message}
-              disabled={isLoading}
-              {...register("password")}
-            />
-
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <input
-                  id="remember"
-                  type="checkbox"
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                />
-                <label
-                  htmlFor="remember"
-                  className="ml-2 block text-sm text-gray-700"
-                >
-                  Remember me
-                </label>
-              </div>
-              <Link
-                href="/forgot-password"
-                className="text-sm text-blue-600 hover:text-blue-500"
-              >
-                Forgot password?
-              </Link>
-            </div>
-
-            <Button type="submit" className="w-full" loading={isLoading}>
-              {isLoading ? "Signing in..." : "Sign in"}
-            </Button>
-          </form>
-        </CardContent>
-        <CardFooter className="flex flex-col space-y-4">
-          <div className="relative w-full">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-gray-300" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white px-2 text-gray-500">
-                Don't have an account?
-              </span>
+        <CardHeader className="space-y-4 text-center">
+          <div className="flex justify-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg gradient-primary">
+              <Zap className="h-7 w-7 text-primary-foreground" />
             </div>
           </div>
-          <Link href="/register" className="w-full">
-            <Button variant="outline" className="w-full" disabled={isLoading}>
-              Create account
+          <div>
+            <CardTitle className="text-2xl">Welcome back</CardTitle>
+            <CardDescription>Sign in to your GigStream account</CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="john@example.com"
+                value={email}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
+                required
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={isLoading} variant="gradient">
+              {isLoading ? 'Signing in...' : 'Sign in'}
             </Button>
-          </Link>
-        </CardFooter>
+          </form>
+          <div className="mt-4 text-center text-sm">
+            <span className="text-muted-foreground">Don't have an account? </span>
+            <Link href="/register" className="text-primary hover:underline font-medium">
+              Sign up
+            </Link>
+          </div>
+        </CardContent>
       </Card>
     </div>
   );

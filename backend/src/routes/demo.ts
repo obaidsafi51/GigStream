@@ -48,7 +48,9 @@ demoRoutes.post(
   zValidator('json', completeTaskSchema),
   async (c) => {
     try {
-      const db = getDatabase();
+      // Get DATABASE_URL from Cloudflare Workers environment or process.env
+      const databaseUrl = c.env?.DATABASE_URL || process.env.DATABASE_URL;
+      const db = getDatabase(databaseUrl);
       const { workerId, platformId, amount, taskType, description } = await c.req.json();
 
       // Step 1: Get or create demo platform
@@ -248,7 +250,8 @@ demoRoutes.post(
  */
 demoRoutes.post('/reset', async (c) => {
   try {
-    const db = getDatabase();
+    const databaseUrl = c.env?.DATABASE_URL || process.env.DATABASE_URL;
+    const db = getDatabase(databaseUrl);
 
     // Step 1: Find all demo tasks
     const demoTasks = await db.query.tasks.findMany({
@@ -379,7 +382,8 @@ demoRoutes.post('/reset', async (c) => {
  */
 demoRoutes.get('/status', async (c) => {
   try {
-    const db = getDatabase();
+    const databaseUrl = c.env?.DATABASE_URL || process.env.DATABASE_URL;
+    const db = getDatabase(databaseUrl);
 
     // Count demo data
     const demoTasksResult = await db

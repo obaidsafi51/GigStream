@@ -11,8 +11,6 @@ const PROTECTED_ROUTES = [
   "/advance",
   "/reputation",
   "/settings",
-  "/workers", // Platform routes
-  "/analytics",
 ];
 
 /**
@@ -23,7 +21,7 @@ const AUTH_ROUTES = ["/login", "/register"];
 /**
  * Public routes that don't require authentication
  */
-const PUBLIC_ROUTES = ["/", "/demo", "/simulator"];
+const PUBLIC_ROUTES = ["/", "/platform"];
 
 /**
  * Check if a path matches any of the route patterns
@@ -31,7 +29,8 @@ const PUBLIC_ROUTES = ["/", "/demo", "/simulator"];
 function matchesRoute(pathname: string, routes: string[]): boolean {
   return routes.some((route) => {
     if (pathname === route) return true;
-    if (pathname.startsWith(route + "/")) return true;
+    // Also handle sub-paths, e.g., /platform/register
+    if (route !== '/' && pathname.startsWith(route + "/")) return true;
     return false;
   });
 }
@@ -43,14 +42,14 @@ function matchesRoute(pathname: string, routes: string[]): boolean {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Hardcoded rule for debugging: always allow /platform routes
+  if (pathname.startsWith('/platform')) {
+    return NextResponse.next();
+  }
+
   // Get auth token from cookies
   const authToken = request.cookies.get("auth_token")?.value;
   const isAuthenticated = !!authToken;
-
-  // Check if route is protected
-  const isProtectedRoute = matchesRoute(pathname, PROTECTED_ROUTES);
-  const isAuthRoute = matchesRoute(pathname, AUTH_ROUTES);
-  const isPublicRoute = matchesRoute(pathname, PUBLIC_ROUTES);
 
   // Skip middleware for API routes and static files
   if (
@@ -62,6 +61,14 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Immediately allow public routes
+  if (matchesRoute(pathname, PUBLIC_ROUTES)) {
+    return NextResponse.next();
+  }
+
+  const isProtectedRoute = matchesRoute(pathname, PROTECTED_ROUTES);
+  const isAuthRoute = matchesRoute(pathname, AUTH_ROUTES);
+
   // Redirect to login if trying to access protected route without auth
   if (isProtectedRoute && !isAuthenticated) {
     const loginUrl = new URL("/login", request.url);
@@ -72,6 +79,15 @@ export function middleware(request: NextRequest) {
   // Redirect to dashboard if trying to access auth routes while authenticated
   if (isAuthRoute && isAuthenticated) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  // If a route is not public, not auth, and not explicitly protected,
+  // but the user is not authenticated, redirect to login.
+  // This acts as a default-deny policy.
+  if (!isAuthenticated && !isAuthRoute && !isProtectedRoute) {
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("redirect", pathname);
+      return NextResponse.redirect(loginUrl);
   }
 
   // Allow request to proceed

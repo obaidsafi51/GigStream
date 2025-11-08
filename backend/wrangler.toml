@@ -21,6 +21,36 @@ remote = true  # Suppress warning about remote resource usage
 #   { pattern = "api.gigstream.com/*", zone_name = "gigstream.com" }
 # ]
 
+# Environment variables for local development
+# Note: Sensitive values (DATABASE_URL, JWT_SECRET, CIRCLE keys) should be set via:
+# - .dev.vars file for local development (automatically loaded by wrangler dev)
+# - `wrangler secret put` for production deployments
+[vars]
+# Wallet Service (Node.js standalone)
+WALLET_SERVICE_URL = "http://localhost:3001"
+WALLET_SERVICE_SECRET = "dev-secret-change-in-production"
+
+# Arc Blockchain
+ARC_RPC_URL = "https://rpc.testnet.arc.network"
+ARC_CHAIN_ID = "5042002"
+ARC_EXPLORER_URL = "https://explorer.circle.com/arc-testnet"
+
+# Application Settings
+NODE_ENV = "development"
+API_PORT = "8787"
+API_BASE_URL = "http://localhost:8787"
+LOG_LEVEL = "debug"
+
+# Feature Flags
+ENABLE_PAYMENT_STREAMING = "true"
+ENABLE_MICRO_LOANS = "true"
+ENABLE_AI_VERIFICATION = "false"
+DEMO_MODE_ENABLED = "true"
+
+# JWT Settings (non-sensitive defaults, override in .dev.vars)
+JWT_ACCESS_TOKEN_EXPIRY = "24h"
+JWT_REFRESH_TOKEN_EXPIRY = "7d"
+
 # Environment variables (use `wrangler secret put` for sensitive values)
 # Note: Use `wrangler deploy --env production` or `wrangler deploy --env staging`
 [env.production]
