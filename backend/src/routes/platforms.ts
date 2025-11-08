@@ -114,9 +114,9 @@ platformsRoutes.post(
  * Get worker list with reputation scores
  */
 platformsRoutes.get('/:platformId/workers', authenticateAPIKey, async (c) => {
-  const _platformId = c.req.param('platformId');
-  const _page = Number(c.req.query('page') || '1');
-  const _limit = Number(c.req.query('limit') || '20');
+  // const platformId = c.req.param('platformId');
+  // const page = Number(c.req.query('page') || '1');
+  // const limit = Number(c.req.query('limit') || '20');
   
   // TODO: Implement worker list retrieval
   return c.json({
@@ -215,7 +215,7 @@ platformsRoutes.get('/:platformId/analytics', authenticateAPIKey, async (c) => {
  * Configure webhook URLs for platform
  */
 platformsRoutes.post('/:platformId/webhooks', authenticateAPIKey, async (c) => {
-  const _platformId = c.req.param('platformId');
+  // const platformId = c.req.param('platformId');
   
   // TODO: Implement webhook configuration
   return c.json({
