@@ -49,7 +49,7 @@ demoRoutes.post(
   async (c) => {
     try {
       // Get DATABASE_URL from Cloudflare Workers environment or process.env
-      const databaseUrl = c.env?.DATABASE_URL || process.env.DATABASE_URL;
+      const databaseUrl =process.env.DATABASE_URL;
       const db = getDatabase(databaseUrl);
       const { workerId, platformId, amount, taskType, description } = await c.req.json();
 
@@ -250,7 +250,7 @@ demoRoutes.post(
  */
 demoRoutes.post('/reset', async (c) => {
   try {
-    const databaseUrl = c.env?.DATABASE_URL || process.env.DATABASE_URL;
+    const databaseUrl = process.env.DATABASE_URL;
     const db = getDatabase(databaseUrl);
 
     // Step 1: Find all demo tasks
@@ -382,7 +382,7 @@ demoRoutes.post('/reset', async (c) => {
  */
 demoRoutes.get('/status', async (c) => {
   try {
-    const databaseUrl = c.env?.DATABASE_URL || process.env.DATABASE_URL;
+    const databaseUrl =  process.env.DATABASE_URL;
     const db = getDatabase(databaseUrl);
 
     // Count demo data
@@ -461,7 +461,7 @@ demoRoutes.get('/status', async (c) => {
  */
 demoRoutes.get('/workers', async (c) => {
   try {
-    const databaseUrl = c.env?.DATABASE_URL || process.env.DATABASE_URL;
+    const databaseUrl =  process.env.DATABASE_URL;
     const db = getDatabase(databaseUrl);
     
     const workers = await db.select().from(schema.workers).limit(20);
@@ -503,7 +503,7 @@ demoRoutes.get('/workers', async (c) => {
  */
 demoRoutes.get('/platforms', async (c) => {
   try {
-    const databaseUrl = c.env?.DATABASE_URL || process.env.DATABASE_URL;
+    const databaseUrl =  process.env.DATABASE_URL;
     const db = getDatabase(databaseUrl);
     
     const platforms = await db.select().from(schema.platforms).limit(20);
@@ -543,7 +543,7 @@ demoRoutes.get('/platforms', async (c) => {
  */
 demoRoutes.get('/tasks', async (c) => {
   try {
-    const databaseUrl = c.env?.DATABASE_URL || process.env.DATABASE_URL;
+    const databaseUrl =  process.env.DATABASE_URL;
     const db = getDatabase(databaseUrl);
     
     const tasks = await db.select().from(schema.tasks).limit(20);
